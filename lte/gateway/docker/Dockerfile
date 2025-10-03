@@ -61,10 +61,8 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     python3.11-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Install pip safely using get-pip.py
 RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
@@ -80,15 +78,11 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     -O /usr/local/bin/bazel && \
     chmod +x /usr/local/bin/bazel && \
     bazel version
-# ----------------------------
-# Pre-download liblfds dependency locally
-# ----------------------------
-RUN wget --no-check-certificate -O /tmp/liblfds.zip "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip"
 
 # ----------------------------
-# Pre-download liblfds dependency locally
+# Pre-download liblfds to avoid SSL fetch errors
 # ----------------------------
-COPY liblfds-release-7.1.0-source.zip /tmp/liblfds.zip
+RUN wget --no-check-certificate -O /tmp/liblfds.zip "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip"
 
 # ----------------------------
 # Copy Magma source and build
@@ -96,10 +90,7 @@ COPY liblfds-release-7.1.0-source.zip /tmp/liblfds.zip
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Tell Bazel to use the local liblfds file instead of HTTPS
-RUN sed -i 's|https://liblfds.org/downloads/liblfds.*zip|file:///tmp/liblfds.zip|' WORKSPACE
-
-# Ensure Bazel uses system CA for Java
+# Avoid Bazel SSL errors for some dependencies
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 RUN bazel build //lte/gateway/c/...
@@ -133,7 +124,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-11-jre \
  && rm -rf /var/lib/apt/lists/*
 
-# Add deadsnakes PPA and install Python 3.11
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
@@ -141,10 +131,8 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     python3.11-dev \
  && rm -rf /var/lib/apt/lists/*
 
-# Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Install pip safely
 RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
