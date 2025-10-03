@@ -82,12 +82,20 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     bazel version
 
 # ----------------------------
+# Pre-download liblfds dependency locally
+# ----------------------------
+COPY liblfds-release-7.1.0-source.zip /tmp/liblfds.zip
+
+# ----------------------------
 # Copy Magma source and build
 # ----------------------------
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Avoid Bazel SSL errors for some dependencies
+# Tell Bazel to use the local liblfds file instead of HTTPS
+RUN sed -i 's|https://liblfds.org/downloads/liblfds.*zip|file:///tmp/liblfds.zip|' WORKSPACE
+
+# Ensure Bazel uses system CA for Java
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 RUN bazel build //lte/gateway/c/...
