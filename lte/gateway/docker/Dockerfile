@@ -46,34 +46,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     openvswitch-switch \
     socat \
-    ca-certificates \
+    libgoogle-glog-dev \
     openjdk-11-jdk \
-    python3-distutils \
-    gnupg \
-    dirmngr && \
-    rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
-# Add deadsnakes PPA and install Python 3.11
+# Install Python 3.11 via deadsnakes
 # ----------------------------
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
     python3.11-dev \
-    python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
 
-# ----------------------------
-# Set Java environment for Bazel
-# ----------------------------
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-ENV PATH=$JAVA_HOME/bin:$PATH
+# Install pip safely using get-pip.py
+RUN python3 -m ensurepip --upgrade && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
+    python3 -m pip install --upgrade --break-system-packages setuptools wheel
+
+# Fix glog symlink for Bazel
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libglog.so.0.6.0 /usr/lib/x86_64-linux-gnu/libglog.so.0
 
 # ----------------------------
 # Install Bazel
@@ -90,8 +87,10 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Disable SSL verification for problematic downloads
-RUN bazel build //lte/gateway/c/... --insecure
+# Avoid Bazel SSL errors for some dependencies
+ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
+
+RUN bazel build //lte/gateway/c/...
 
 # ============================
 # Runtime Stage
@@ -100,35 +99,43 @@ FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-ENV PATH=$JAVA_HOME/bin:$PATH
 
 # ----------------------------
-# Install runtime dependencies
+# Runtime dependencies
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
-    python3-pip \
+    software-properties-common \
+    lsb-release \
+    gnupg \
+    wget \
+    curl \
+    sudo \
+    bash \
+    procps \
     iproute2 \
     iputils-ping \
     net-tools \
     ca-certificates \
-    curl \
     openvswitch-switch \
     socat \
-    sudo \
-    bash \
-    procps \
-    openjdk-11-jdk && \
-    rm -rf /var/lib/apt/lists/*
+    openjdk-11-jre \
+ && rm -rf /var/lib/apt/lists/*
+
+# Add deadsnakes PPA and install Python 3.11
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+ && rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Ensure pip is upgraded safely
-RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
+# Install pip safely
+RUN python3 -m ensurepip --upgrade && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
+    python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
 # ----------------------------
 # Copy Magma build artifacts from builder
