@@ -67,6 +67,17 @@ RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade setuptools wheel
 
+# Ensure ASN.1 compiler and glog
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    asn1c \
+    libgoogle-glog-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fix glog symlink for Bazel
+RUN ln -sf /usr/lib/x86_64-linux-gnu/libglog.so.0.6.0 /usr/lib/x86_64-linux-gnu/libglog.so.0
+
+
 # ----------------------------
 # Install Bazel
 # ----------------------------
