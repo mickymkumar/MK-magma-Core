@@ -1,13 +1,11 @@
 # Copyright 2021 The Magma Authors.
 
-# This source code is licensed under the BSD-style license found in
-# the LICENSE file in the root directory of this source tree.
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 # See https://magma.github.io/magma/docs/next/bazel/agw_with_bazel
 # for an introduction to bazel for the Magma AGW
@@ -16,7 +14,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 load("//bazel:third_party_repositories.bzl", "grpc")
 
 # ----------------------------
-# Python rules
+# HTTP archives for Bazel rules
 # ----------------------------
 http_archive(
     name = "rules_python",
@@ -31,9 +29,6 @@ http_archive(
     url = "https://github.com/cedarai/rules_pyvenv/archive/refs/tags/1.0.tar.gz",
 )
 
-# ----------------------------
-# Go rules
-# ----------------------------
 http_archive(
     name = "io_bazel_rules_go",
     sha256 = "8e968b5fcea1d2d64071872b12737bbb5514524ee5f0a4f54f5920266c261acb",
@@ -56,7 +51,9 @@ load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("//bazel:go_repositories.bzl", "go_repositories")
 
-# gazelle:repository_macro bazel/go_repositories.bzl%go_repositories
+# ----------------------------
+# Go dependencies
+# ----------------------------
 go_repositories()
 go_rules_dependencies()
 go_register_toolchains(version = "1.17")
@@ -78,7 +75,7 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
 # ----------------------------
-# C++ rules
+# Rules CC
 # ----------------------------
 http_archive(
     name = "rules_cc",
@@ -86,31 +83,23 @@ http_archive(
     strip_prefix = "rules_cc-40548a2974f1aea06215272d9c2b47a14a24e556",
     urls = ["https://github.com/bazelbuild/rules_cc/archive/40548a2974f1aea06215272d9c2b47a14a24e556.zip"],
 )
-
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies")
 rules_cc_dependencies()
 
 # ----------------------------
-# Proto / gRPC
+# Proto / gRPC dependencies
 # ----------------------------
 grpc()
-
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 rules_proto_grpc_toolchains()
 rules_proto_grpc_repos()
-
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
 rules_proto_dependencies()
 rules_proto_toolchains()
-
 load("@rules_proto_grpc//cpp:repositories.bzl", rules_proto_grpc_cpp_repos = "cpp_repos")
 rules_proto_grpc_cpp_repos()
-
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
-
-load("//bazel:cpp_repositories.bzl", "cpp_repositories")
-cpp_repositories()
 
 # ----------------------------
 # Local / system repositories
@@ -118,18 +107,40 @@ cpp_repositories()
 local_repository(
     name = "system_libraries",
     path = "/",
-    build_file = "//bazel/external:system_libraries.BUILD",
+    build_file_content = """
+cc_library(
+    name = "system_libraries",
+    srcs = [],
+    hdrs = [],
+    visibility = ["//visibility:public"],
+)
+""",
 )
 
 local_repository(
     name = "s1ap_test_util",
     path = "lte/gateway/c/core/oai/test/s1ap_test_util",
-    build_file = "//bazel/external:s1ap_test_util.BUILD",
+    build_file_content = """
+cc_library(
+    name = "s1ap_test_util",
+    srcs = glob(["**/*.c", "**/*.cpp"]),
+    hdrs = glob(["**/*.h"]),
+    visibility = ["//visibility:public"],
+)
+""",
 )
 
 local_repository(
     name = "liblfds",
     path = "third_party/liblfds/liblfds-release-7.1.0-source",
+    build_file_content = """
+cc_library(
+    name = "liblfds",
+    srcs = glob(["*.c"]),
+    hdrs = glob(["*.h"]),
+    visibility = ["//visibility:public"],
+)
+""",
 )
 
 # ----------------------------
@@ -148,7 +159,7 @@ load("//bazel:python_repositories.bzl", "python_repositories")
 python_repositories()
 
 # ----------------------------
-# rules_pkg
+# Rules package
 # ----------------------------
 http_archive(
     name = "rules_pkg",
@@ -158,13 +169,9 @@ http_archive(
         "https://github.com/bazelbuild/rules_pkg/releases/download/0.8.0/rules_pkg-0.8.0.tar.gz",
     ],
 )
-
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 rules_pkg_dependencies()
 
-# ----------------------------
-# bazel_diff
-# ----------------------------
 http_jar(
     name = "bazel_diff",
     sha256 = "45761593a478d1e432e8cfa9629b9dbf08cd610bafd29b04305de77644470722",
