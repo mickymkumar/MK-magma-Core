@@ -1,28 +1,16 @@
-# ========================================
-# Local repositories (must be at the top for Bazel 5.x)
-# ========================================
-local_repository(
-    name = "system_libraries",
-    path = "bazel/external/system_libraries",
-)
-
-local_repository(
-    name = "s1ap_test_util",
-    path = "bazel/external/s1ap_test_util",
-)
-
-local_repository(
-    name = "liblfds",
-    path = "third_party/liblfds/liblfds-release-7.1.0-source",
-)
+# Copyright 2021 The Magma Authors.
+# BSD-style license
 
 # ========================================
-# Load Bazel tools and external rules
+# Basic Bazel rules and repositories
 # ========================================
+
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 load("//bazel:third_party_repositories.bzl", "grpc")
 
+# ----------------------------
 # Python rules
+# ----------------------------
 http_archive(
     name = "rules_python",
     sha256 = "cd6730ed53a002c56ce4e2f396ba3b3be262fd7cb68339f0377a45e8227fe332",
@@ -36,7 +24,9 @@ http_archive(
     url = "https://github.com/cedarai/rules_pyvenv/archive/refs/tags/1.0.tar.gz",
 )
 
+# ----------------------------
 # Go rules
+# ----------------------------
 http_archive(
     name = "io_bazel_rules_go",
     sha256 = "8e968b5fcea1d2d64071872b12737bbb5514524ee5f0a4f54f5920266c261acb",
@@ -64,7 +54,9 @@ go_rules_dependencies()
 go_register_toolchains(version = "1.17")
 gazelle_dependencies(go_repository_default_config = "@//:WORKSPACE.bazel")
 
+# ----------------------------
 # Skylib
+# ----------------------------
 http_archive(
     name = "bazel_skylib",
     sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
@@ -77,7 +69,9 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
+# ----------------------------
 # C++ rules
+# ----------------------------
 http_archive(
     name = "rules_cc",
     sha256 = "56ac9633c13d74cb71e0546f103ce1c58810e4a76aa8325da593ca4277908d72",
@@ -88,7 +82,9 @@ http_archive(
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies")
 rules_cc_dependencies()
 
+# ----------------------------
 # Proto / gRPC
+# ----------------------------
 grpc()
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 rules_proto_grpc_toolchains()
@@ -107,7 +103,9 @@ grpc_deps()
 load("//bazel:cpp_repositories.bzl", "cpp_repositories")
 cpp_repositories()
 
+# ----------------------------
 # Python deps
+# ----------------------------
 load("//bazel:python_dependencies.bzl", "configure_python_dependencies")
 configure_python_dependencies()
 
@@ -120,7 +118,9 @@ load_swagger_repositories()
 load("//bazel:python_repositories.bzl", "python_repositories")
 python_repositories()
 
+# ----------------------------
 # rules_pkg
+# ----------------------------
 http_archive(
     name = "rules_pkg",
     sha256 = "eea0f59c28a9241156a47d7a8e32db9122f3d50b505fae0f33de6ce4d9b61834",
@@ -137,4 +137,23 @@ http_jar(
     name = "bazel_diff",
     sha256 = "45761593a478d1e432e8cfa9629b9dbf08cd610bafd29b04305de77644470722",
     urls = ["https://github.com/Tinder/bazel-diff/releases/download/4.1.0/bazel-diff_deploy.jar"],
+)
+
+# ========================================
+# Local repositories (Bazel 5.x compatible)
+# ========================================
+
+local_repository(
+    name = "system_libraries",
+    path = "bazel/external/system_libraries",
+)
+
+local_repository(
+    name = "s1ap_test_util",
+    path = "bazel/external/s1ap_test_util",
+)
+
+local_repository(
+    name = "liblfds",
+    path = "third_party/liblfds/liblfds-release-7.1.0-source",
 )
