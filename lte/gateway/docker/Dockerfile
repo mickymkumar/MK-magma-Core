@@ -80,6 +80,10 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     -O /usr/local/bin/bazel && \
     chmod +x /usr/local/bin/bazel && \
     bazel version
+# ----------------------------
+# Pre-download liblfds dependency locally
+# ----------------------------
+RUN wget --no-check-certificate -O /tmp/liblfds.zip "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip"
 
 # ----------------------------
 # Pre-download liblfds dependency locally
