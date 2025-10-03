@@ -116,6 +116,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python 3.11 and runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    lsb-release \
+    gnupg \
+    wget \
+    curl && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
     python3-pip \
@@ -137,7 +144,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 # Ensure pip is available
 RUN python3 -m ensurepip --upgrade
 
-# Upgrade pip, setuptools, wheel safely
+#  Upgrade pip, setuptools, wheel safely using --break-system-packages
 RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
 
 # ----------------------------
