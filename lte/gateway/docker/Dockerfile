@@ -1,112 +1,110 @@
 # ============================
-# Magma AGW Dockerfile - Ubuntu 24.04, Python 3.9
+# Ubuntu 24.04 Base Image
 # ============================
 FROM ubuntu:24.04 AS builder
 
-# ---------------------------
-# Environment variables
-# ---------------------------
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-ENV PATH="/usr/local/bin:$PATH"
+ENV MAGMA_ROOT=/magma
 
-# ---------------------------
-# Install basic tools and dependencies
-# ---------------------------
+# ----------------------------
+# Install system dependencies
+# ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     wget \
     curl \
     lsb-release \
     gnupg \
-    build-essential \
-    git \
-    unzip \
-    cmake \
-    pkg-config \
-    libssl-dev \
-    libnl-3-dev \
-    libnl-genl-3-dev \
     sudo \
     bash \
     procps \
+    build-essential \
+    cmake \
+    pkg-config \
+    git \
+    unzip \
     autoconf \
     automake \
     libtool \
-    asn1c \
+    libssl-dev \
+    libffi-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libncursesw5-dev \
+    xz-utils \
+    tk-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    liblzma-dev \
     bison \
     flex \
-    openjdk-11-jdk \
- && rm -rf /var/lib/apt/lists/*
+    asn1c \
+    iproute2 \
+    iputils-ping \
+    net-tools \
+    openvswitch-switch \
+    socat \
+    && rm -rf /var/lib/apt/lists/*
 
-# ---------------------------
-# Install Python 3.9 and pip
-# ---------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# ----------------------------
+# Install Python 3.9 from deadsnakes
+# ----------------------------
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3.9 \
     python3.9-venv \
     python3.9-dev \
     python3-pip \
- && python3.9 -m pip install --upgrade pip \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# ---------------------------
-# Build Google glog from source
-# ---------------------------
-RUN git clone https://github.com/google/glog.git /tmp/glog && \
-    cd /tmp/glog && \
-    mkdir build && cd build && \
-    cmake .. && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    rm -rf /tmp/glog
+# Ensure python3 points to python3.9
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+RUN python3 -m ensurepip --upgrade
+RUN python3 -m pip install --upgrade pip setuptools wheel
 
-# ---------------------------
-# Install Bazelisk (Bazel version manager)
-# ---------------------------
-RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 && chmod +x /usr/local/bin/bazel
+# ----------------------------
+# Install Bazel
+# ----------------------------
+ARG BAZEL_VERSION=5.2.0
+RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 \
+    -O /usr/local/bin/bazel && \
+    chmod +x /usr/local/bin/bazel && \
+    bazel version
 
-# ---------------------------
-# Copy Magma source
-# ---------------------------
-WORKDIR /magma
-COPY . /magma
-RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
+# ----------------------------
+# Set working directory
+# ----------------------------
+WORKDIR ${MAGMA_ROOT}
 
-# ---------------------------
-# Pre-install Python packages for Bazel rules_python
-# ---------------------------
-RUN python3.9 -m pip install \
-    setuptools \
-    wheel \
-    packaging \
-    tomli \
-    protobuf \
-    pyparsing \
-    pyyaml \
-    six
+# ----------------------------
+# Copy Magma source code
+# ----------------------------
+# Assumes you have cloned the magma repo locally
+COPY . ${MAGMA_ROOT}
 
-# ---------------------------
-# Build all C binaries
-# ---------------------------
-WORKDIR /magma/lte/gateway
+# ----------------------------
+# Build AGW C binaries
+# ----------------------------
 RUN bazel build //lte/gateway/c/...
 
-# ============================
-# Runtime image
-# ============================
+# ----------------------------
+# Optional: verify python deps
+# ----------------------------
+RUN python3 --version && pip3 --version
+
+# ----------------------------
+# Runtime stage (slim)
+# ----------------------------
 FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
-ENV PATH="/usr/local/bin:$PATH"
+ENV MAGMA_ROOT=/magma
 
-# ---------------------------
+# ----------------------------
 # Install runtime dependencies
-# ---------------------------
+# ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.9 \
     python3-pip \
@@ -120,18 +118,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     bash \
     procps \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# ---------------------------
-# Copy built binaries and scripts
-# ---------------------------
-COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
-COPY --from=builder /magma/lte/gateway/docker/run_agw_services.sh /magma/lte/gateway/docker/run_agw_services.sh
-RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
+# Ensure python3 points to python3.9
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+RUN python3 -m ensurepip --upgrade
+RUN python3 -m pip install --upgrade pip setuptools wheel
 
-WORKDIR /magma/lte/gateway
+# ----------------------------
+# Copy AGW build artifacts from builder
+# ----------------------------
+COPY --from=builder /magma /magma
 
-# ---------------------------
-# Start AGW services
-# ---------------------------
-CMD ["/magma/lte/gateway/docker/run_agw_services.sh"]
+WORKDIR ${MAGMA_ROOT}
+CMD ["/bin/bash"]
