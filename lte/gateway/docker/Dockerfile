@@ -80,7 +80,13 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     bazel version
 
 # ----------------------------
-# Pre-download liblfds locally
+# Copy Magma source
+# ----------------------------
+WORKDIR ${MAGMA_ROOT}
+COPY . ${MAGMA_ROOT}
+
+# ----------------------------
+# Pre-download and extract liblfds locally
 # ----------------------------
 RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
     wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
@@ -88,12 +94,8 @@ RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
     unzip ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
 
 # ----------------------------
-# Copy Magma source
+# Avoid Bazel SSL errors for Java
 # ----------------------------
-WORKDIR ${MAGMA_ROOT}
-COPY . ${MAGMA_ROOT}
-
-# Avoid Bazel SSL errors
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 # ----------------------------
@@ -144,7 +146,7 @@ RUN python3 -m ensurepip --upgrade && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
 # ----------------------------
-# Copy Magma build artifacts
+# Copy Magma build artifacts from builder
 # ----------------------------
 COPY --from=builder /magma /magma
 
