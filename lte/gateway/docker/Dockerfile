@@ -1,5 +1,5 @@
 # ============================
-# Ubuntu 24.04 Base Image
+# Builder Stage
 # ============================
 FROM ubuntu:24.04 AS builder
 
@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Install system dependencies
+# Install build tools and dependencies
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
@@ -45,19 +45,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     net-tools \
     openvswitch-switch \
-    socat \
-    && rm -rf /var/lib/apt/lists/*
+    socat
 
 # ----------------------------
-# Install Python 3.11 from deadsnakes
+# Install Python 3.11 via deadsnakes
 # ----------------------------
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
     python3.11-dev \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+    python3-pip && \
+    rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
@@ -74,27 +73,14 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     bazel version
 
 # ----------------------------
-# Set working directory
+# Copy Magma source and build
 # ----------------------------
 WORKDIR ${MAGMA_ROOT}
-
-# ----------------------------
-# Copy Magma source code
-# ----------------------------
 COPY . ${MAGMA_ROOT}
-
-# ----------------------------
-# Build AGW C binaries
-# ----------------------------
 RUN bazel build //lte/gateway/c/...
 
-# ----------------------------
-# Verify Python installation
-# ----------------------------
-RUN python3 --version && pip3 --version
-
 # ============================
-# Runtime stage (slim)
+# Runtime Stage
 # ============================
 FROM ubuntu:24.04 AS runtime
 
@@ -102,10 +88,26 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Install runtime dependencies
+# Add deadsnakes PPA for Python 3.11
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    lsb-release \
+    gnupg \
+    wget \
+    curl \
+    sudo \
+    bash \
+    procps && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update
+
+# ----------------------------
+# Install Python 3.11 + runtime deps
+# ----------------------------
+RUN apt-get install -y --no-install-recommends \
     python3.11 \
+    python3.11-venv \
     python3-pip \
     iproute2 \
     iputils-ping \
@@ -116,16 +118,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
     sudo \
     bash \
-    procps \
-    && rm -rf /var/lib/apt/lists/*
+    procps && \
+    rm -rf /var/lib/apt/lists/*
 
-# Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN python3 -m ensurepip --upgrade
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
 # ----------------------------
-# Copy AGW build artifacts from builder
+# Copy Magma build artifacts from builder
 # ----------------------------
 COPY --from=builder /magma /magma
 
