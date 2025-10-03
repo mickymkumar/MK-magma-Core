@@ -2,7 +2,6 @@
 # Magma AGW Dockerfile for 5G
 # ==============================
 
-# Arguments for architecture
 ARG CPU_ARCH=amd64
 ARG DEB_PORT=amd64
 
@@ -22,15 +21,12 @@ WORKDIR /magma
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
     build-essential \
     git \
     wget \
     curl \
     unzip \
-    python3.11 \
-    python3.11-venv \
-    python3.11-dev \
-    python3-pip \
     cmake \
     pkg-config \
     gnupg \
@@ -40,6 +36,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     bash \
     procps \
+ && add-apt-repository ppa:deadsnakes/ppa \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    python3-pip \
  && rm -rf /var/lib/apt/lists/*
 
 # Set Python 3.11 as default
@@ -78,8 +81,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
     MAGMA_ROOT=/magma
 
-# Install runtime dependencies
+WORKDIR /magma
+
+# Runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
     iproute2 \
     iputils-ping \
     net-tools \
@@ -94,8 +100,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /magma
-
 # Copy Docker scripts
 COPY lte/gateway/docker /magma/lte/gateway/docker
 
@@ -107,6 +111,3 @@ RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh || true
 
 # Entrypoint
 ENTRYPOINT ["/magma/lte/gateway/docker/run_agw_services.sh"]
-
-# Optional: CMD for debugging
-# CMD ["/bin/bash"]
