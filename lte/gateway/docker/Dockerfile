@@ -52,16 +52,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
-# Install Python 3.11 via deadsnakes
+# Install Python 3.10 (compatible)
 # ----------------------------
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
-    python3.11-dev \
+    python3.10 \
+    python3.10-venv \
+    python3.10-dev \
  && rm -rf /var/lib/apt/lists/*
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
 RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
@@ -86,12 +86,12 @@ WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
 # ----------------------------
-# Pre-download and extract liblfds locally (non-interactive)
+# Pre-download liblfds
 # ----------------------------
 RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
     wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip -o ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
+    unzip -q ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
 
 # ----------------------------
 # Avoid Bazel SSL errors for Java
@@ -134,18 +134,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
-    python3.11-dev \
+    python3.10 \
+    python3.10-venv \
+    python3.10-dev \
  && rm -rf /var/lib/apt/lists/*
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+
 RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
 # ----------------------------
-# Copy Magma build artifacts from builder
+# Copy Magma build artifacts
 # ----------------------------
 COPY --from=builder /magma /magma
 
