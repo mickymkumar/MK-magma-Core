@@ -1,15 +1,12 @@
-# Multi-stage Dockerfile for Magma AGW with Python 3.10
-
-########################
-# Builder stage
-########################
+# ============================
+# Stage 1: Builder
+# ============================
 FROM ubuntu:24.04 AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8
+# Set noninteractive mode for apt
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build tools and dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -17,9 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     unzip \
     software-properties-common \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
+    python3 \
+    python3-venv \
+    python3-dev \
     python3-pip \
     cmake \
     pkg-config \
@@ -32,46 +29,45 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
+# Install Bazel 5.2.0
+RUN mkdir -p /usr/local/lib/bazel/bin && \
+    cd /usr/local/lib/bazel/bin && \
+    curl -fLO https://releases.bazel.build/5.2.0/release/bazel-5.2.0-linux-x86_64 && \
+    chmod +x bazel-5.2.0-linux-x86_64 && \
+    ln -sf /usr/local/lib/bazel/bin/bazel-5.2.0-linux-x86_64 /usr/local/bin/bazel
+
+# Set workdir
 WORKDIR /magma
 
-# Copy full Magma repo into builder
+# Copy source code
 COPY . /magma
 
-# Install Python dependencies if requirements exist
-RUN if [ -f ./lte/gateway/docker/requirements.txt ]; then \
-      python3.10 -m pip install --no-cache-dir -r ./lte/gateway/docker/requirements.txt || true; \
-    fi
+# Give execute permissions to AGW scripts
+RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
-# Install Bazel 5.2.0
-RUN mkdir -p /usr/local/lib/bazel/bin \
- && curl -fLo /usr/local/lib/bazel/bin/bazel-5.2.0-linux-x86_64 https://releases.bazel.build/5.2.0/release/bazel-5.2.0-linux-x86_64 \
- && chmod +x /usr/local/lib/bazel/bin/bazel-5.2.0-linux-x86_64 \
- && ln -sf /usr/local/lib/bazel/bin/bazel-5.2.0-linux-x86_64 /usr/local/bin/bazel
-
-# Build AGW C binaries
+# Build AGW binaries
 WORKDIR /magma/lte/gateway
-RUN bazel build //lte/gateway/c/...
+RUN bazel build //lte/gateway/c/... --config=opt
 
-########################
-# Runtime stage
-########################
+# ============================
+# Stage 2: Runtime
+# ============================
 FROM ubuntu:24.04 AS runtime
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    MAGMA_ROOT=/magma
+# Set noninteractive mode
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
     iproute2 \
     iputils-ping \
     net-tools \
     ca-certificates \
     curl \
     openvswitch-switch \
-    python3.10 \
+    python3 \
+    python3-venv \
+    python3-dev \
     python3-pip \
     socat \
     sudo \
@@ -79,17 +75,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /magma
+# Create magma runtime directories
+RUN mkdir -p /magma/lte/gateway/build/c \
+             /var/opt/magma
 
-# Copy full Magma repo and C binaries from builder
-COPY --from=builder /magma /magma
-COPY --from=builder /magma/bazel-bin/c /magma/lte/gateway/build/c
+# Copy built AGW binaries from builder
+COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
 
-# Ensure the run script is executable
+# Copy run script
+COPY --from=builder /magma/lte/gateway/docker/run_agw_services.sh /magma/lte/gateway/docker/run_agw_services.sh
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
-# Entrypoint to start AGW services
-ENTRYPOINT ["/magma/lte/gateway/docker/run_agw_services.sh"]
+# Set workdir
+WORKDIR /magma/lte/gateway
 
-# Optional CMD for debugging
-# CMD ["/bin/bash"]
+# Entry point
+CMD ["/magma/lte/gateway/docker/run_agw_services.sh"]
