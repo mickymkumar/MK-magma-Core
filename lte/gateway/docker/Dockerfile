@@ -67,7 +67,6 @@ RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
-# Fix glog symlink for Bazel
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libglog.so.0.6.0 /usr/lib/x86_64-linux-gnu/libglog.so.0
 
 # ----------------------------
@@ -80,20 +79,25 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     bazel version
 
 # ----------------------------
-# Pre-download liblfds to avoid SSL fetch errors
-# ----------------------------
-RUN wget --no-check-certificate -O /tmp/liblfds.zip "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip"
-
-# ----------------------------
-# Copy Magma source and build
+# Copy Magma source and local liblfds
 # ----------------------------
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Avoid Bazel SSL errors for some dependencies
+# Copy liblfds zip to a known location in the image
+COPY third_party/liblfds/liblfds-release-7.1.0-source.zip /tmp/liblfds.zip
+
+# Extract liblfds locally
+RUN unzip /tmp/liblfds.zip -d third_party/liblfds/
+
+# Tell Bazel to use the local liblfds path
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
-RUN bazel build //lte/gateway/c/...
+# ----------------------------
+# Build Magma
+# ----------------------------
+RUN bazel build //lte/gateway/c/... \
+    --override_repository=liblfds=${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source
 
 # ============================
 # Runtime Stage
@@ -103,9 +107,6 @@ FROM ubuntu:24.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
-# ----------------------------
-# Runtime dependencies
-# ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     lsb-release \
@@ -137,9 +138,6 @@ RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
-# ----------------------------
-# Copy Magma build artifacts from builder
-# ----------------------------
 COPY --from=builder /magma /magma
 
 WORKDIR ${MAGMA_ROOT}
