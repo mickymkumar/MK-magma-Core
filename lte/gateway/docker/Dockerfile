@@ -45,7 +45,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     net-tools \
     openvswitch-switch \
-    socat
+    socat \
+ && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
 # Install Python 3.11 via deadsnakes
@@ -55,15 +56,15 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     python3.11 \
     python3.11-venv \
     python3.11-dev \
-    python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Ensure pip is available and upgraded safely
-RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
+# Install pip safely using get-pip.py
+RUN python3 -m ensurepip --upgrade && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
+    python3 -m pip install --upgrade setuptools wheel
 
 # ----------------------------
 # Install Bazel
@@ -90,7 +91,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Install runtime dependencies and Python 3.11
+# Runtime dependencies
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
@@ -106,20 +107,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     ca-certificates \
     openvswitch-switch \
-    socat && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
+    socat \
+ && rm -rf /var/lib/apt/lists/*
+
+# Add deadsnakes PPA and install Python 3.11
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
-    python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+    python3.11-dev \
+ && rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Ensure pip is available and upgraded safely
-RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
+# Install pip safely
+RUN python3 -m ensurepip --upgrade && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
+    python3 -m pip install --upgrade setuptools wheel
 
 # ----------------------------
 # Copy Magma build artifacts from builder
