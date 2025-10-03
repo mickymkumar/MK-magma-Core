@@ -1,5 +1,5 @@
 # ============================
-# Magma AGW Dockerfile - Ubuntu 24.04, Python 3.10
+# Magma AGW Dockerfile - Ubuntu 24.04, latest Python
 # ============================
 
 # ---------------------------
@@ -17,19 +17,16 @@ ENV PATH="/usr/local/bin:$PATH"
 # Install build dependencies
 # ---------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
+    software-properties-common \
     wget \
     curl \
+    lsb-release \
+    gnupg \
+    build-essential \
+    git \
     unzip \
-    software-properties-common \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
-    python3-pip \
     cmake \
     pkg-config \
-    gnupg \
     libssl-dev \
     libnl-3-dev \
     libnl-genl-3-dev \
@@ -42,6 +39,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     asn1c \
     bison \
     flex \
+ && rm -rf /var/lib/apt/lists/*
+
+# Add deadsnakes PPA for latest Python
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
  && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------
@@ -68,13 +75,10 @@ COPY . /magma
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
 # ---------------------------
-# Build AGW binaries using Bazel
+# Install Bazel (Bazelisk) for building AGW
 # ---------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-11-jdk \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-11-jdk && rm -rf /var/lib/apt/lists/*
 
-# Install Bazelisk
 RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 && \
     chmod +x /usr/local/bin/bazel
 
@@ -104,7 +108,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     openvswitch-switch \
-    python3.10 \
+    python3.12 \
     python3-pip \
     socat \
     sudo \
