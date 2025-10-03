@@ -1,20 +1,18 @@
 # ============================
-# Magma AGW Dockerfile - Ubuntu 24.04, latest Python
+# Magma AGW Dockerfile - Ubuntu 24.04, Python 3.9
 # ============================
-
-# ---------------------------
-# Builder stage
-# ---------------------------
 FROM ubuntu:24.04 AS builder
 
-# Set environment
+# ---------------------------
+# Environment variables
+# ---------------------------
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PATH="/usr/local/bin:$PATH"
 
 # ---------------------------
-# Install build dependencies
+# Install basic tools and dependencies
 # ---------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
@@ -39,20 +37,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     asn1c \
     bison \
     flex \
- && rm -rf /var/lib/apt/lists/*
-
-# Add deadsnakes PPA for latest Python
-RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    python3.12 \
-    python3.12-venv \
-    python3.12-dev \
-    python3-pip \
+    openjdk-11-jdk \
  && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------
-# Build and install Google glog from source
+# Install Python 3.9 and pip
+# ---------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.9 \
+    python3.9-venv \
+    python3.9-dev \
+    python3-pip \
+ && python3.9 -m pip install --upgrade pip \
+ && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------
+# Build Google glog from source
 # ---------------------------
 RUN git clone https://github.com/google/glog.git /tmp/glog && \
     cd /tmp/glog && \
@@ -64,32 +64,39 @@ RUN git clone https://github.com/google/glog.git /tmp/glog && \
     rm -rf /tmp/glog
 
 # ---------------------------
-# Set working directory
+# Install Bazelisk (Bazel version manager)
+# ---------------------------
+RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 && chmod +x /usr/local/bin/bazel
+
+# ---------------------------
+# Copy Magma source
 # ---------------------------
 WORKDIR /magma
-
-# Copy source code
 COPY . /magma
-
-# Make scripts executable
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
 # ---------------------------
-# Install Bazel (Bazelisk) for building AGW
+# Pre-install Python packages for Bazel rules_python
 # ---------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends openjdk-11-jdk && rm -rf /var/lib/apt/lists/*
+RUN python3.9 -m pip install \
+    setuptools \
+    wheel \
+    packaging \
+    tomli \
+    protobuf \
+    pyparsing \
+    pyyaml \
+    six
 
-RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 && \
-    chmod +x /usr/local/bin/bazel
-
-WORKDIR /magma/lte/gateway
-
+# ---------------------------
 # Build all C binaries
+# ---------------------------
+WORKDIR /magma/lte/gateway
 RUN bazel build //lte/gateway/c/...
 
-# ---------------------------
-# Runtime stage
-# ---------------------------
+# ============================
+# Runtime image
+# ============================
 FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -101,29 +108,30 @@ ENV PATH="/usr/local/bin:$PATH"
 # Install runtime dependencies
 # ---------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
+    python3.9 \
+    python3-pip \
     iproute2 \
     iputils-ping \
     net-tools \
     ca-certificates \
     curl \
     openvswitch-switch \
-    python3.12 \
-    python3-pip \
     socat \
     sudo \
     bash \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
-# Copy AGW binaries from builder
+# ---------------------------
+# Copy built binaries and scripts
+# ---------------------------
 COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
-
-# Copy scripts
 COPY --from=builder /magma/lte/gateway/docker/run_agw_services.sh /magma/lte/gateway/docker/run_agw_services.sh
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
 WORKDIR /magma/lte/gateway
 
-# Entry point
+# ---------------------------
+# Start AGW services
+# ---------------------------
 CMD ["/magma/lte/gateway/docker/run_agw_services.sh"]
