@@ -49,18 +49,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
-# Install Python 3.9 from deadsnakes
+# Install Python 3.11 from deadsnakes
 # ----------------------------
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
-    python3.9 \
-    python3.9-venv \
-    python3.9-dev \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure python3 points to python3.9
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+# Make python3 point to python3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN python3 -m ensurepip --upgrade
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
@@ -81,7 +81,6 @@ WORKDIR ${MAGMA_ROOT}
 # ----------------------------
 # Copy Magma source code
 # ----------------------------
-# Assumes you have cloned the magma repo locally
 COPY . ${MAGMA_ROOT}
 
 # ----------------------------
@@ -90,13 +89,13 @@ COPY . ${MAGMA_ROOT}
 RUN bazel build //lte/gateway/c/...
 
 # ----------------------------
-# Optional: verify python deps
+# Verify Python installation
 # ----------------------------
 RUN python3 --version && pip3 --version
 
-# ----------------------------
+# ============================
 # Runtime stage (slim)
-# ----------------------------
+# ============================
 FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -106,7 +105,7 @@ ENV MAGMA_ROOT=/magma
 # Install runtime dependencies
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.9 \
+    python3.11 \
     python3-pip \
     iproute2 \
     iputils-ping \
@@ -120,8 +119,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure python3 points to python3.9
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+# Make python3 point to python3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 RUN python3 -m ensurepip --upgrade
 RUN python3 -m pip install --upgrade pip setuptools wheel
 
