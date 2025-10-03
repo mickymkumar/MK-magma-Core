@@ -105,7 +105,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ----------------------------
 # Install Python 3.11 + runtime deps
 # ----------------------------
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    lsb-release \
+    wget \
+    gnupg \
+    curl && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Python 3.11 and runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.11 \
     python3.11-venv \
     python3-pip \
@@ -121,9 +131,14 @@ RUN apt-get install -y --no-install-recommends \
     procps && \
     rm -rf /var/lib/apt/lists/*
 
+# Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Ensure pip is available
 RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade pip setuptools wheel
+
+# Upgrade pip, setuptools, wheel safely
+RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
 
 # ----------------------------
 # Copy Magma build artifacts from builder
