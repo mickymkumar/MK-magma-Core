@@ -60,8 +60,10 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Ensure pip is available and upgraded safely
 RUN python3 -m ensurepip --upgrade
-RUN python3 -m pip install --upgrade pip setuptools wheel
+RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
 
 # ----------------------------
 # Install Bazel
@@ -88,7 +90,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Add deadsnakes PPA for Python 3.11
+# Install runtime dependencies and Python 3.11
 # ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
@@ -98,53 +100,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     sudo \
     bash \
-    procps && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update
-
-# ----------------------------
-# Install Python 3.11 + runtime deps
-# ----------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    lsb-release \
-    wget \
-    gnupg \
-    curl && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Python 3.11 and runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    lsb-release \
-    gnupg \
-    wget \
-    curl && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 \
-    python3.11-venv \
-    python3-pip \
+    procps \
     iproute2 \
     iputils-ping \
     net-tools \
     ca-certificates \
-    curl \
     openvswitch-switch \
-    socat \
-    sudo \
-    bash \
-    procps && \
+    socat && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3-pip && \
     rm -rf /var/lib/apt/lists/*
 
 # Make python3 point to python3.11
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 
-# Ensure pip is available
+# Ensure pip is available and upgraded safely
 RUN python3 -m ensurepip --upgrade
-
-#  Upgrade pip, setuptools, wheel safely using --break-system-packages
 RUN python3 -m pip install --upgrade --break-system-packages pip setuptools wheel
 
 # ----------------------------
