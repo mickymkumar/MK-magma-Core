@@ -86,15 +86,12 @@ WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
 # ----------------------------
-# Pre-download and extract liblfds locally (fixed)
+# Pre-download and extract liblfds locally (non-interactive)
 # ----------------------------
 RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
-    wget --no-check-certificate -O "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip" \
+    wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip -q -o "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip" -d "${MAGMA_ROOT}/third_party/liblfds/" && \
-    sh -c 'mv "${MAGMA_ROOT}/third_party/liblfds/liblfds release 7.1.0 source"/* "${MAGMA_ROOT}/third_party/liblfds/"' || true && \
-    rm -rf "${MAGMA_ROOT}/third_party/liblfds/liblfds release 7.1.0 source" && \
-    rm "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip"
+    unzip -o ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
 
 # ----------------------------
 # Avoid Bazel SSL errors for Java
@@ -143,7 +140,6 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
  && rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-
 RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
