@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     net-tools \
     openvswitch-switch \
     socat \
+    libgoogle-glog-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
