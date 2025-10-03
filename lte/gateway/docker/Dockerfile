@@ -86,12 +86,15 @@ WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
 # ----------------------------
-# Pre-download and extract liblfds locally
+# Pre-download and extract liblfds locally (fixed)
 # ----------------------------
 RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
-    wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
+    wget --no-check-certificate -O "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip" \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
+    unzip -q -o "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip" -d "${MAGMA_ROOT}/third_party/liblfds/" && \
+    sh -c 'mv "${MAGMA_ROOT}/third_party/liblfds/liblfds release 7.1.0 source"/* "${MAGMA_ROOT}/third_party/liblfds/"' || true && \
+    rm -rf "${MAGMA_ROOT}/third_party/liblfds/liblfds release 7.1.0 source" && \
+    rm "${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip"
 
 # ----------------------------
 # Avoid Bazel SSL errors for Java
