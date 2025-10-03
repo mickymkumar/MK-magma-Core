@@ -1,12 +1,21 @@
 # ============================
-# Stage 1: Builder
+# Magma AGW Dockerfile - Ubuntu 24.04, Python 3.10
 # ============================
-FROM ubuntu:22.04 AS builder
 
+# ---------------------------
+# Builder stage
+# ---------------------------
+FROM ubuntu:24.04 AS builder
+
+# Set environment
 ENV DEBIAN_FRONTEND=noninteractive
-ENV BAZEL_VERSION=5.2.0
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PATH="/usr/local/bin:$PATH"
 
-# Install build tools and dependencies
+# ---------------------------
+# Install build dependencies
+# ---------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -30,42 +39,65 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf \
     automake \
     libtool \
-    pkg-config \
-    libglog-dev \
     asn1c \
     bison \
     flex \
  && rm -rf /var/lib/apt/lists/*
 
-# Install Bazel
-RUN mkdir -p /usr/local/lib/bazel/bin && \
-    curl -fLO https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 && \
-    chmod +x bazel-${BAZEL_VERSION}-linux-x86_64 && \
-    mv bazel-${BAZEL_VERSION}-linux-x86_64 /usr/local/lib/bazel/bin/bazel && \
-    ln -sf /usr/local/lib/bazel/bin/bazel /usr/local/bin/bazel
+# ---------------------------
+# Build and install Google glog from source
+# ---------------------------
+RUN git clone https://github.com/google/glog.git /tmp/glog && \
+    cd /tmp/glog && \
+    mkdir build && cd build && \
+    cmake .. && \
+    make -j$(nproc) && \
+    make install && \
+    ldconfig && \
+    rm -rf /tmp/glog
 
+# ---------------------------
 # Set working directory
+# ---------------------------
 WORKDIR /magma
 
-# Copy Magma source code
+# Copy source code
 COPY . /magma
 
-# Make run script executable
+# Make scripts executable
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
-# Build AGW binaries
+# ---------------------------
+# Build AGW binaries using Bazel
+# ---------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-11-jdk \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Bazelisk
+RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 && \
+    chmod +x /usr/local/bin/bazel
+
 WORKDIR /magma/lte/gateway
+
+# Build all C binaries
 RUN bazel build //lte/gateway/c/...
 
-# ============================
-# Stage 2: Runtime
-# ============================
-FROM ubuntu:22.04 AS runtime
+# ---------------------------
+# Runtime stage
+# ---------------------------
+FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PATH="/usr/local/bin:$PATH"
 
+# ---------------------------
 # Install runtime dependencies
+# ---------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
     iproute2 \
     iputils-ping \
     net-tools \
@@ -80,15 +112,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /magma/lte/gateway
-
 # Copy AGW binaries from builder
 COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
 
-# Copy run script
+# Copy scripts
 COPY --from=builder /magma/lte/gateway/docker/run_agw_services.sh /magma/lte/gateway/docker/run_agw_services.sh
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
-# Set entrypoint
-ENTRYPOINT ["/magma/lte/gateway/docker/run_agw_services.sh"]
+WORKDIR /magma/lte/gateway
+
+# Entry point
+CMD ["/magma/lte/gateway/docker/run_agw_services.sh"]
