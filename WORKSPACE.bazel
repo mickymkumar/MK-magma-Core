@@ -1,10 +1,24 @@
-# Copyright 2021 The Magma Authors.
-# BSD-style license
+# ========================================
+# Local repositories (must be at the top for Bazel 5.x)
+# ========================================
+local_repository(
+    name = "system_libraries",
+    path = "bazel/external/system_libraries",
+)
+
+local_repository(
+    name = "s1ap_test_util",
+    path = "bazel/external/s1ap_test_util",
+)
+
+local_repository(
+    name = "liblfds",
+    path = "third_party/liblfds/liblfds-release-7.1.0-source",
+)
 
 # ========================================
-# Basic Bazel rules and repositories
+# Load Bazel tools and external rules
 # ========================================
-
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 load("//bazel:third_party_repositories.bzl", "grpc")
 
@@ -123,23 +137,4 @@ http_jar(
     name = "bazel_diff",
     sha256 = "45761593a478d1e432e8cfa9629b9dbf08cd610bafd29b04305de77644470722",
     urls = ["https://github.com/Tinder/bazel-diff/releases/download/4.1.0/bazel-diff_deploy.jar"],
-)
-
-# ========================================
-# Local repositories (Bazel 5.x compatible)
-# ========================================
-
-local_repository(
-    name = "system_libraries",
-    path = "bazel/external/system_libraries",
-)
-
-local_repository(
-    name = "s1ap_test_util",
-    path = "bazel/external/s1ap_test_util",
-)
-
-local_repository(
-    name = "liblfds",
-    path = "third_party/liblfds/liblfds-release-7.1.0-source",
 )
