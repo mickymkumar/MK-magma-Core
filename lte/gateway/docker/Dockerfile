@@ -93,14 +93,13 @@ RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Avoid Bazel SSL errors for some dependencies
+# Avoid Bazel SSL errors
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 # ----------------------------
 # Build Magma using local liblfds
 # ----------------------------
-RUN bazel build //lte/gateway/c/... \
-    --override_repository=liblfds=${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source
+RUN bazel build //lte/gateway/c/...
 
 # ============================
 # Runtime Stage
@@ -145,7 +144,7 @@ RUN python3 -m ensurepip --upgrade && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
 # ----------------------------
-# Copy Magma build artifacts from builder
+# Copy Magma build artifacts
 # ----------------------------
 COPY --from=builder /magma /magma
 
