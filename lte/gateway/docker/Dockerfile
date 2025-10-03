@@ -67,6 +67,7 @@ RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
+# Fix glog symlink for Bazel
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libglog.so.0.6.0 /usr/lib/x86_64-linux-gnu/libglog.so.0
 
 # ----------------------------
@@ -79,22 +80,24 @@ RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/
     bazel version
 
 # ----------------------------
-# Copy Magma source and local liblfds
+# Pre-download liblfds locally
+# ----------------------------
+RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
+    wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
+    "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
+    unzip ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
+
+# ----------------------------
+# Copy Magma source
 # ----------------------------
 WORKDIR ${MAGMA_ROOT}
 COPY . ${MAGMA_ROOT}
 
-# Copy liblfds zip to a known location in the image
-COPY third_party/liblfds/liblfds-release-7.1.0-source.zip /tmp/liblfds.zip
-
-# Extract liblfds locally
-RUN unzip /tmp/liblfds.zip -d third_party/liblfds/
-
-# Tell Bazel to use the local liblfds path
+# Avoid Bazel SSL errors for some dependencies
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 # ----------------------------
-# Build Magma
+# Build Magma using local liblfds
 # ----------------------------
 RUN bazel build //lte/gateway/c/... \
     --override_repository=liblfds=${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source
@@ -107,6 +110,9 @@ FROM ubuntu:24.04 AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
+# ----------------------------
+# Runtime dependencies
+# ----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     lsb-release \
@@ -138,6 +144,9 @@ RUN python3 -m ensurepip --upgrade && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade --break-system-packages setuptools wheel
 
+# ----------------------------
+# Copy Magma build artifacts from builder
+# ----------------------------
 COPY --from=builder /magma /magma
 
 WORKDIR ${MAGMA_ROOT}
