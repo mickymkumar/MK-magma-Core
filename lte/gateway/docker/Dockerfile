@@ -13,7 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# Install build tools (update if your AGW build requires more)
+# Install build tools + Bazel dependencies
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     build-essential \
@@ -29,17 +29,27 @@ RUN apt-get update \
     libssl-dev \
     libnl-3-dev \
     libnl-genl-3-dev \
+    openjdk-17-jdk \
+    unzip \
  && rm -rf /var/lib/apt/lists/*
+
+# Install Bazelisk (recommended way to manage Bazel versions)
+RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.15.0/bazelisk-linux-amd64 \
+ && chmod +x /usr/local/bin/bazel
 
 WORKDIR /magma
 
 # Copy repo into builder
 COPY . /magma
 
-# Example: install Python dependencies if they exist
+# Install Python dependencies if they exist
 RUN if [ -f ./lte/gateway/docker/requirements.txt ]; then \
       pip3 install --no-cache-dir -r ./lte/gateway/docker/requirements.txt || true; \
     fi
+
+# Build all AGW C binaries using Bazel
+WORKDIR /magma/lte/gateway
+RUN bazel build //lte/gateway/c/... --config=opt
 
 ########################
 # Runtime stage
@@ -51,7 +61,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# Runtime deps needed by AGW (tweak as needed)
+# Runtime deps needed by AGW
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
     iproute2 \
@@ -70,17 +80,18 @@ RUN apt-get update \
 
 WORKDIR /magma
 
-# Copy artifacts from builder
+# Copy the repo and Bazel-built binaries from builder
 COPY --from=builder /magma /magma
+COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
 
 # Ensure scripts are executable
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh || true
 
-# Default env
+# Default environment
 ENV MAGMA_ROOT=/magma
 
 # Entrypoint script from repo
 ENTRYPOINT ["/magma/lte/gateway/docker/run_agw_services.sh"]
 
-# Alternative for debugging:
+# Alternative for debugging
 # CMD ["/bin/bash"]
