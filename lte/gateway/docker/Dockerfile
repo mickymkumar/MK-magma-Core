@@ -99,10 +99,9 @@ RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
 ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 
 # ----------------------------
-# Build Magma using local liblfds
+# Build Magma using Bazel
 # ----------------------------
-RUN bazel build //lte/gateway/c/... \
-    --override_repository=liblfds=${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source
+RUN bazel build //lte/gateway/c/...
 
 # ============================
 # Runtime Stage
