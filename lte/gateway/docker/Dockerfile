@@ -101,7 +101,8 @@ ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
 # ----------------------------
 # Build Magma using local liblfds
 # ----------------------------
-RUN bazel build //lte/gateway/c/...
+RUN bazel build //lte/gateway/c/... \
+    --override_repository=liblfds=${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source
 
 # ============================
 # Runtime Stage
