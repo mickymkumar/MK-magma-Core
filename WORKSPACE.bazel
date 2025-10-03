@@ -164,3 +164,15 @@ http_jar(
     sha256 = "45761593a478d1e432e8cfa9629b9dbf08cd610bafd29b04305de77644470722",
     urls = ["https://github.com/Tinder/bazel-diff/releases/download/4.1.0/bazel-diff_deploy.jar"],
 )
+
+# ----------------------------
+# Local liblfds (avoid SSL fetch)
+# ----------------------------
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "new_local_repository")
+
+new_local_repository(
+    name = "liblfds",
+    path = "third_party/liblfds/liblfds-release-7.1.0-source",
+    build_file = "@//bazel/external:liblfds.BUILD",
+)
+
