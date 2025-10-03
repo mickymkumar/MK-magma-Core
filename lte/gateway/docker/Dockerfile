@@ -1,6 +1,6 @@
-# --------------------------
+# ============================
 # Stage 1: Builder
-# --------------------------
+# ============================
 FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -27,9 +27,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo \
     bash \
     procps \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    libglog-dev \
+    asn1c \
+    bison \
+    flex \
  && rm -rf /var/lib/apt/lists/*
 
-# Install Bazel 5.2.0
+# Install Bazel
 RUN mkdir -p /usr/local/lib/bazel/bin && \
     curl -fLO https://releases.bazel.build/${BAZEL_VERSION}/release/bazel-${BAZEL_VERSION}-linux-x86_64 && \
     chmod +x bazel-${BAZEL_VERSION}-linux-x86_64 && \
@@ -39,7 +47,7 @@ RUN mkdir -p /usr/local/lib/bazel/bin && \
 # Set working directory
 WORKDIR /magma
 
-# Copy source code
+# Copy Magma source code
 COPY . /magma
 
 # Make run script executable
@@ -49,9 +57,9 @@ RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 WORKDIR /magma/lte/gateway
 RUN bazel build //lte/gateway/c/...
 
-# --------------------------
+# ============================
 # Stage 2: Runtime
-# --------------------------
+# ============================
 FROM ubuntu:22.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -72,6 +80,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
  && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
+WORKDIR /magma/lte/gateway
+
 # Copy AGW binaries from builder
 COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
 
@@ -79,7 +90,5 @@ COPY --from=builder /magma/lte/gateway/bazel-bin/c /magma/lte/gateway/build/c
 COPY --from=builder /magma/lte/gateway/docker/run_agw_services.sh /magma/lte/gateway/docker/run_agw_services.sh
 RUN chmod +x /magma/lte/gateway/docker/run_agw_services.sh
 
-WORKDIR /magma/lte/gateway
-
-# Entrypoint to start all AGW services
+# Set entrypoint
 ENTRYPOINT ["/magma/lte/gateway/docker/run_agw_services.sh"]
