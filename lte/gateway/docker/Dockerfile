@@ -1,7 +1,8 @@
 # ----------------------------
 # Stage 0: Base image
 # ----------------------------
-FROM ubuntu:22.04 AS base  # use Ubuntu 22.04 to get Python 3.10
+# Use Ubuntu 22.04 to get Python 3.10
+FROM ubuntu:22.04 AS base
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,10 +11,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
     git \
-    python3.10 \
-    python3.10-venv \
-    python3.10-distutils \
+    python3 \
     python3-pip \
+    python3-venv \
     openvswitch-switch \
     iproute2 \
     net-tools \
@@ -40,12 +40,12 @@ WORKDIR $MAGMA_ROOT
 FROM base AS build-c
 
 # Install Bazel 5.2.0
-RUN apt-get update && apt-get install -y curl gnupg apt-transport-https && \
-    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > /usr/share/keyrings/bazel-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-        | tee /etc/apt/sources.list.d/bazel.list && \
-    apt-get update && apt-get install -y bazel-5.2.0 && \
-    ln -s /usr/bin/bazel-5.2.0 /usr/bin/bazel
+RUN apt-get update && apt-get install -y curl gnupg apt-transport-https
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel-archive-keyring.gpg \
+    && mv bazel-archive-keyring.gpg /usr/share/keyrings
+RUN echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
+    | tee /etc/apt/sources.list.d/bazel.list
+RUN apt-get update && apt-get install -y bazel-5.2.0
 
 # Copy Magma source
 COPY . $MAGMA_ROOT
@@ -57,15 +57,23 @@ RUN mkdir -p $MAGMA_ROOT/third_party/liblfds && \
     unzip -o -q $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip -d $MAGMA_ROOT/third_party/liblfds
 
 # Build all C services with Bazel
-RUN bazel build //lte/gateway/c/...
+RUN bazel-5.2.0 build //lte/gateway/c/...
 
 # ----------------------------
 # Stage 2: Python build
 # ----------------------------
-FROM base AS build-python
+FROM ubuntu:22.04 AS build-python
 
-# Use Python 3.10
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-venv \
+    python3-pip \
+    git \
+    build-essential \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /magma
 
@@ -104,5 +112,5 @@ WORKDIR $MAGMA_ROOT
 # Expose necessary ports
 EXPOSE 50051-50082 60051 60055 8443
 
-# Entrypoint
+# Entrypoint for Python services
 ENTRYPOINT ["/usr/bin/env", "python3", "-m", "magma.magmad.main"]
