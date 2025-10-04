@@ -1,63 +1,49 @@
 # -----------------------------
-# Full Magma LTE + AGW build
+# Magma LTE/AGW Ubuntu 24.04
 # -----------------------------
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # -----------------------------
 # Step 1: Install system dependencies
 # -----------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
-    pkg-config \
-    libsystemd-dev \
-    libssl-dev \
-    libffi-dev \
-    git \
     curl \
     wget \
-    unzip \
-    openjdk-11-jdk \
-    python3.11 \
-    python3.11-venv \
+    git \
+    pkg-config \
+    libsystemd-dev \
+    libffi-dev \
+    libssl-dev \
+    python3.12 \
+    python3.12-venv \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
-# Step 2: Install Bazelisk (Bazel manager)
-# -----------------------------
-RUN curl -Lo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.15.0/bazelisk-linux-amd64 \
-    && chmod +x /usr/local/bin/bazel
-
-# -----------------------------
-# Step 3: Setup Python
+# Step 2: Set Python path
 # -----------------------------
 ENV PATH="/usr/local/bin:$PATH"
-ENV PYTHON_BIN_PATH=/usr/bin/python3.11
+ENV PYTHON_BIN_PATH=/usr/bin/python3.12
 
-# Upgrade pip, setuptools, wheel, cython
-RUN python3.11 -m pip install --upgrade pip setuptools wheel cython
+# Upgrade pip & setuptools & wheel
+RUN python3.12 -m pip install --upgrade pip setuptools wheel cython
 
 # -----------------------------
-# Step 4: Copy Magma repo
+# Step 3: Copy Magma gateway source
 # -----------------------------
 WORKDIR /magma
 COPY . .
 
 # -----------------------------
-# Step 5: Install LTE Python dependencies
+# Step 4: Install Python LTE packages
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
-RUN pip install -e .
+RUN pip install --no-cache-dir -e .
 
 # -----------------------------
-# Step 6: Build C gateway with Bazel
-# -----------------------------
-WORKDIR /magma
-RUN bazel build //lte/gateway/c/... --jobs=$(nproc)
-
-# -----------------------------
-# Step 7: Default runtime
+# Step 5: Default runtime
 # -----------------------------
 WORKDIR /magma
 CMD ["/bin/bash"]
