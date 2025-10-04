@@ -8,8 +8,8 @@ echo "=========================="
 # Enable IP forwarding
 sysctl -w net.ipv4.ip_forward=1
 
-# Define virtual environment path
-VENV_PATH=/opt/venv
+# Set virtual environment path (inside project folder)
+VENV_PATH=/magma/venv
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "$VENV_PATH" ]; then
@@ -21,12 +21,9 @@ fi
 echo "[*] Activating virtual environment..."
 source $VENV_PATH/bin/activate
 
-# Upgrade pip and install requirements if not installed
+# Upgrade pip and install Magma Python packages if not installed
 pip install --upgrade pip setuptools wheel
-REQ_FILE=/magma/magma/lte/gateway/python/requirements.txt
-if [ -f "$REQ_FILE" ]; then
-    pip install -r $REQ_FILE
-fi
+pip install -e /magma/magma/lte/gateway/python
 
 # Start LTE Gateway Python service
 echo "[*] Starting LTE Gateway..."
