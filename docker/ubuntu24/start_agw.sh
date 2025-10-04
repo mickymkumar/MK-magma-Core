@@ -5,35 +5,50 @@ echo "=========================="
 echo "Starting Magma AGW (LTE + 5G)"
 echo "=========================="
 
-# Enable IP forwarding
+# Enable IP forwarding (needed for UPF/NAT)
 sysctl -w net.ipv4.ip_forward=1
 
-# Set virtual environment path (inside project folder)
-VENV_PATH=/magma/venv
+# Install system dependencies if missing
+echo "[*] Installing system dependencies..."
+apt-get update
+apt-get install -y python3 python3-venv python3-pip
 
 # Create virtual environment if it doesn't exist
-if [ ! -d "$VENV_PATH" ]; then
-    echo "[*] Creating Python virtual environment at $VENV_PATH..."
-    python3 -m venv $VENV_PATH
+VENV_DIR="/magma/venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[*] Creating Python virtual environment at $VENV_DIR..."
+    python3 -m venv "$VENV_DIR"
 fi
 
 # Activate virtual environment
 echo "[*] Activating virtual environment..."
-source $VENV_PATH/bin/activate
+source "$VENV_DIR/bin/activate"
 
-# Upgrade pip and install Magma Python packages if not installed
+# Upgrade pip inside venv
 pip install --upgrade pip setuptools wheel
-pip install -e /magma/magma/lte/gateway/python
+
+# Install required Python packages for LTE
+echo "[*] Installing Python dependencies..."
+LTE_PYTHON_DIR="/magma/lte/gateway/python"
+if [ -f "$LTE_PYTHON_DIR/setup.py" ]; then
+    pip install -e "$LTE_PYTHON_DIR"
+fi
 
 # Start LTE Gateway Python service
 echo "[*] Starting LTE Gateway..."
-cd /magma/magma/lte/gateway/python
-python3 -m lte.cli &
+cd "$LTE_PYTHON_DIR"
+# Check if lte.cli module exists
+if python -c "import lte.cli" &> /dev/null; then
+    python -m lte.cli &
+else
+    echo "[!] Could not find lte.cli module. Skipping LTE Gateway."
+fi
 
 # Start 5G Core binaries if available
-if [ -d /magma/5g/core ]; then
+CORE_DIR="/magma/5g/core"
+if [ -d "$CORE_DIR" ]; then
     echo "[*] Starting 5G Core services..."
-    cd /magma/5g/core
+    cd "$CORE_DIR"
     [ -f ./run_amf.sh ] && ./run_amf.sh &
     [ -f ./run_smf.sh ] && ./run_smf.sh &
     [ -f ./run_upf.sh ] && ./run_upf.sh &
