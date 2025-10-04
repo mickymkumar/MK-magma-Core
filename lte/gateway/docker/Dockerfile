@@ -1,117 +1,54 @@
 # ----------------------------
 # Stage 0: Base image
 # ----------------------------
-# Use Ubuntu 22.04 to get Python 3.10
-FROM ubuntu:22.04 AS base
+FROM ubuntu:24.04 AS base
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    curl \
-    build-essential \
-    git \
-    python3 \
-    python3-pip \
-    python3-venv \
-    openvswitch-switch \
-    iproute2 \
-    net-tools \
-    iputils-ping \
-    sudo \
-    software-properties-common \
-    pkg-config \
-    libssl-dev \
-    libffi-dev \
-    cmake \
-    libtins-dev \
-    gnupg \
-    lsb-release \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set environment variables
-ENV MAGMA_ROOT=/magma
+# Prevent interactive prompts during install
 ENV DEBIAN_FRONTEND=noninteractive
-WORKDIR $MAGMA_ROOT
 
-# ----------------------------
-# Stage 1: Build C dependencies
-# ----------------------------
-FROM base AS build-c
-
-# Install Bazel 5.2.0
-RUN apt-get update && apt-get install -y curl gnupg apt-transport-https
-RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel-archive-keyring.gpg \
-    && mv bazel-archive-keyring.gpg /usr/share/keyrings
-RUN echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-    | tee /etc/apt/sources.list.d/bazel.list
-RUN apt-get update && apt-get install -y bazel-5.2.0
-
-# Copy Magma source
-COPY . $MAGMA_ROOT
-
-# Download and unzip liblfds
-RUN mkdir -p $MAGMA_ROOT/third_party/liblfds && \
-    wget --no-check-certificate -O $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip \
-    "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip -o -q $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip -d $MAGMA_ROOT/third_party/liblfds
-
-# Build all C services with Bazel
-RUN bazel-5.2.0 build //lte/gateway/c/...
-
-# ----------------------------
-# Stage 2: Python build
-# ----------------------------
-FROM ubuntu:22.04 AS build-python
-
-# Install dependencies
+# Install basic tools and Python
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-venv \
-    python3-pip \
-    git \
-    build-essential \
-    wget \
-    unzip \
+    python3.12 python3.12-venv python3.12-dev \
+    build-essential git curl wget pkg-config \
+    libssl-dev libffi-dev libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /magma
+# Set python3 -> python3.12
+RUN ln -s /usr/bin/python3.12 /usr/bin/python3 && \
+    ln -s /usr/bin/pip3 /usr/bin/pip
 
-# Copy Magma source
-COPY . .
+# ----------------------------
+# Stage 1: Python environment
+# ----------------------------
+FROM base AS build-python
 
-# Create virtual environment
+# Create a virtual environment
 RUN python3 -m venv /opt/venv
-
-# Activate venv and install dependencies
-RUN /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/venv/bin/pip install -r /magma/lte/gateway/python/requirements.txt
-
-
-# Set environment to use the venv by default
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Upgrade pip & tools inside venv
+RUN pip install --upgrade pip setuptools wheel
+
+# Copy Magma LTE Python source
+WORKDIR /magma
+COPY . .
+
+# Install Python deps via setup.py (instead of requirements.txt)
+WORKDIR /magma/lte/gateway/python
+RUN pip install -e .
+
 # ----------------------------
-# Stage 3: Final runtime image
+# Stage 2: Runtime image
 # ----------------------------
 FROM base AS runtime
 
-# Copy C binaries from build stage
-COPY --from=build-c $MAGMA_ROOT/bazel-bin/lte/gateway/c/sctpd/sctpd /usr/local/bin/sctpd
-COPY --from=build-c $MAGMA_ROOT/bazel-bin/lte/gateway/c/oai_mme/oai_mme /usr/local/bin/oai_mme
-COPY --from=build-c $MAGMA_ROOT/bazel-bin/lte/gateway/c/sessiond/sessiond /usr/local/bin/sessiond
-COPY --from=build-c $MAGMA_ROOT/bazel-bin/lte/gateway/c/connectiond/connectiond /usr/local/bin/connectiond
-COPY --from=build-c $MAGMA_ROOT/bazel-bin/lte/gateway/c/liagentd/liagentd /usr/local/bin/liagentd
+# Copy virtual environment from build stage
+COPY --from=build-python /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy Python files and dependencies
-COPY --from=build-python $MAGMA_ROOT /magma
+# Copy Magma LTE gateway code
+WORKDIR /magma
+COPY . .
 
-# Set environment
-ENV MAGMA_ROOT=/magma
-WORKDIR $MAGMA_ROOT
-
-# Expose necessary ports
-EXPOSE 50051-50082 60051 60055 8443
-
-# Entrypoint for Python services
-ENTRYPOINT ["/usr/bin/env", "python3", "-m", "magma.magmad.main"]
+# Default command (adjust if you want to run specific service)
+CMD ["python3", "-m", "magma"]
