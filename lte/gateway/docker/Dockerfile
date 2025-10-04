@@ -38,10 +38,20 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
-RUN python3.12 -m venv /opt/venv \
+RUN add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        python3.10 \
+        python3.10-venv \
+        python3-pip \
+        python3.10-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3.10 -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
 
 ENV PATH="/opt/venv/bin:$PATH"
+
 
 # -----------------------------
 # Step 3: Copy Magma source code
