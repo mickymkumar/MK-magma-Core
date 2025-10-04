@@ -35,9 +35,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip & setuptools
 RUN pip install --upgrade pip setuptools wheel
 
+# Install system deps for lxml & pystemd
+RUN apt-get update && apt-get install -y \
+    libsystemd-dev pkg-config
+
 # Install Python dependencies for Magma LTE gateway
 WORKDIR /magma/lte/gateway/python
 RUN pip install --upgrade cython && pip install -e .
+
 
 # ----------------------------
 # Stage 2: Build AGW binaries
