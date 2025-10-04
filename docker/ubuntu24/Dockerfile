@@ -14,7 +14,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         sudo systemd systemd-sysv \
         net-tools iproute2 bridge-utils openvswitch-switch iputils-ping tcpdump iptables \
-        python3 python3-venv python3-pip python3-dev python3-distutils \
+        python3 python3-venv python3-pip python3-dev \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
