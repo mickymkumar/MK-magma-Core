@@ -26,6 +26,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     iptables \
     sudo \
     software-properties-common \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -60,7 +61,7 @@ COPY . .
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
-# Install system build dependencies for wheels
+# Install system build dependencies for Python wheels
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libxml2-dev libxslt1-dev zlib1g-dev python3-dev build-essential libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -69,8 +70,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 RUN pip install --no-cache-dir --upgrade pip wheel cython
 RUN pip install --no-cache-dir "setuptools==65.5.0"
 
-# Install Magma Python packages
-RUN pip install --no-cache-dir -e .
+# Install Magma Python packages via requirements.txt
+COPY lte/gateway/python/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # -----------------------------
 # Step 6: Setup 5G Core binaries (AMF, SMF, UPF)
@@ -89,7 +91,6 @@ RUN sysctl -w net.ipv4.ip_forward=1
 # -----------------------------
 COPY start_agw.sh /magma/start_agw.sh
 RUN chmod +x /magma/start_agw.sh
-
 
 # -----------------------------
 # Step 9: Default runtime
