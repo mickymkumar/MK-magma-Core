@@ -3,8 +3,6 @@
 # -----------------------------
 FROM ubuntu:24.04
 
-FROM ubuntu:24.04
-
 # -----------------------------
 # Step 1: Install system dependencies
 # -----------------------------
@@ -18,8 +16,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     libsystemd-dev \
     libffi-dev \
     libssl-dev \
+    libxml2-dev \
+    libxslt1-dev \
     python3.12 \
     python3.12-venv \
+    python3.12-distutils \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
