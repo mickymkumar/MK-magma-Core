@@ -8,43 +8,40 @@ echo "=========================="
 # Enable IP forwarding
 sysctl -w net.ipv4.ip_forward=1
 
-# Paths
 VENV_PATH=/opt/venv
-LTE_PYTHON_PATH=/magma/lte/gateway/python
+LTE_PATH=/magma/lte/gateway/python
+CORE5G_PATH=/magma/5g/core
 
 # Activate venv
-echo "[*] Activating virtual environment..."
 source $VENV_PATH/bin/activate
-
-# Upgrade pip, setuptools, wheel
 pip install --upgrade pip setuptools wheel
 
-# Add LTE python directories to PYTHONPATH
-export PYTHONPATH=$LTE_PYTHON_PATH:$LTE_PYTHON_PATH/magma:$PYTHONPATH
+# Export PYTHONPATH
+export PYTHONPATH=$LTE_PATH:$LTE_PATH/magma:$PYTHONPATH
 
-# Start LTE Gateway services
-for service in magmad mobilityd state_service; do
-    if [ -f "$LTE_PYTHON_PATH/$service.py" ]; then
-        echo "[*] Starting $service..."
-        python3 "$LTE_PYTHON_PATH/$service.py" &
-    fi
-done
-
-# Start 5G Core services if available
-if [ -d /magma/5g/core ]; then
-    echo "[*] Starting 5G Core services..."
-    cd /magma/5g/core
-    [ -f ./run_amf.sh ] && ./run_amf.sh &
-    [ -f ./run_smf.sh ] && ./run_smf.sh &
-    [ -f ./run_upf.sh ] && ./run_upf.sh &
+# Start LTE services if available
+if [ -d "$LTE_PATH/magma" ]; then
+    echo "[*] Starting LTE services..."
+    for svc in magmad mobilityd state_service; do
+        if [ -f "$LTE_PATH/magma/$svc.py" ]; then
+            python3 "$LTE_PATH/magma/$svc.py" &
+        fi
+    done
 fi
 
-# Wait for initialization
-sleep 5
+# Start 5G Core services if available
+if [ -d "$CORE5G_PATH" ]; then
+    echo "[*] Starting 5G Core services..."
+    cd $CORE5G_PATH
+    for svc in run_amf.sh run_smf.sh run_upf.sh; do
+        [ -f "$svc" ] && bash "$svc" &
+    done
+fi
 
-# Verify
-echo "[*] Checking LTE and 5G services..."
-ps aux | grep -E "python3.*_service|amf|smf|upf" | grep -v grep
+# Wait and check
+sleep 5
+echo "[*] Active processes:"
+ps aux | grep -E "python3|amf|smf|upf" | grep -v grep
 
 echo "=========================="
 echo "Magma AGW startup complete"
