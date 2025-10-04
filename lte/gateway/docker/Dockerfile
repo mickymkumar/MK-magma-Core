@@ -1,155 +1,99 @@
 # ============================
-# Builder Stage
+# Stage 1: Build Magma
 # ============================
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Install build tools and dependencies
+# Install system dependencies
 # ----------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     wget \
+    unzip \
     curl \
-    lsb-release \
-    gnupg \
-    sudo \
-    bash \
-    procps \
+    git \
+    python3 \
+    python3-pip \
+    python3-setuptools \
     build-essential \
     cmake \
-    pkg-config \
-    git \
-    unzip \
-    autoconf \
-    automake \
-    libtool \
-    libssl-dev \
-    libffi-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    xz-utils \
-    tk-dev \
-    libgdbm-dev \
-    libnss3-dev \
-    liblzma-dev \
-    bison \
-    flex \
-    asn1c \
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    openvswitch-switch \
-    socat \
-    libgoogle-glog-dev \
+    ninja-build \
     openjdk-11-jdk \
-    ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+    pkg-config \
+    libssl-dev \
+    asn1c \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python alternative
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+
+WORKDIR $MAGMA_ROOT
 
 # ----------------------------
-# Install Python 3.10 (compatible)
+# Copy Magma source code
 # ----------------------------
-RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
- && rm -rf /var/lib/apt/lists/*
-
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
-
-RUN python3 -m ensurepip --upgrade && \
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
-    python3 -m pip install --upgrade --break-system-packages setuptools wheel
-
-# Fix glog symlink for Bazel
-RUN ln -sf /usr/lib/x86_64-linux-gnu/libglog.so.0.6.0 /usr/lib/x86_64-linux-gnu/libglog.so.0
+# COPY your local Magma source code here
+# COPY . $MAGMA_ROOT
 
 # ----------------------------
-# Install Bazel
-# ----------------------------
-ARG BAZEL_VERSION=5.2.0
-RUN wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 \
-    -O /usr/local/bin/bazel && \
-    chmod +x /usr/local/bin/bazel && \
-    bazel version
-
-# ----------------------------
-# Copy Magma source
-# ----------------------------
-WORKDIR ${MAGMA_ROOT}
-COPY . ${MAGMA_ROOT}
-
-# ----------------------------
-# Pre-download liblfds
+# liblfds setup
 # ----------------------------
 RUN mkdir -p ${MAGMA_ROOT}/third_party/liblfds && \
     wget --no-check-certificate -O ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip -qo ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
-
-
-# ----------------------------
-# Avoid Bazel SSL errors for Java
-# ----------------------------
-ENV JAVA_TOOL_OPTIONS="-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts"
+    unzip -q -o ${MAGMA_ROOT}/third_party/liblfds/liblfds-release-7.1.0-source.zip -d ${MAGMA_ROOT}/third_party/liblfds/
 
 # ----------------------------
-# Build Magma using Bazel
+# Bazel install
 # ----------------------------
-RUN bazel build //lte/gateway/c/...
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg && \
+    mv bazel-archive-keyring.gpg /usr/share/keyrings && \
+    apt-get update && \
+    apt-get install -y apt-transport-https gnupg && \
+    echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://bazel.build/apt stable jdk1.11" \
+    | tee /etc/apt/sources.list.d/bazel.list && \
+    apt-get update && apt-get install -y bazel && \
+    apt-get clean
+
+# ----------------------------
+# Local system_libraries for Bazel
+# ----------------------------
+RUN mkdir -p ${MAGMA_ROOT}/bazel/external/system_libraries && \
+    echo "" > ${MAGMA_ROOT}/bazel/external/system_libraries/WORKSPACE && \
+    echo 'filegroup(name = "asn1c", srcs = [])' > ${MAGMA_ROOT}/bazel/external/system_libraries/BUILD.bazel
+
+# ----------------------------
+# Build Magma
+# ----------------------------
+RUN bazel clean --expunge && \
+    bazel build //lte/gateway/c/...
 
 # ============================
-# Runtime Stage
+# Stage 2: Runtime Image
 # ============================
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:22.04
 
-ENV DEBIAN_FRONTEND=noninteractive
 ENV MAGMA_ROOT=/magma
 
 # ----------------------------
-# Runtime dependencies
+# Install runtime dependencies
 # ----------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
-    lsb-release \
-    gnupg \
-    wget \
-    curl \
-    sudo \
-    bash \
-    procps \
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    ca-certificates \
-    openvswitch-switch \
-    socat \
-    openjdk-11-jre \
- && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libssl-dev \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3.10-venv \
-    python3.10-dev \
- && rm -rf /var/lib/apt/lists/*
+WORKDIR $MAGMA_ROOT
 
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
+# Copy Magma binaries from builder
+COPY --from=builder /magma/bazel-bin/lte/gateway/c /magma/binaries
 
-RUN python3 -m ensurepip --upgrade && \
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
-    python3 -m pip install --upgrade --break-system-packages setuptools wheel
+# Set PATH to include Magma binaries
+ENV PATH="$MAGMA_ROOT/binaries:$PATH"
 
-# ----------------------------
-# Copy Magma build artifacts
-# ----------------------------
-COPY --from=builder /magma /magma
-
-WORKDIR ${MAGMA_ROOT}
+# Default command (optional)
 CMD ["/bin/bash"]
