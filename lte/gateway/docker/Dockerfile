@@ -19,10 +19,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     libxml2-dev \
     libxslt1-dev \
     libgmp-dev \
-    python3.12 \
-    python3.12-venv \
+    python3.11 \
+    python3.11-venv \
     python3-pip \
-    python3-dev \
+    python3.11-dev \
     libpq-dev \
     net-tools \
     iproute2 \
@@ -37,7 +37,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
-RUN python3.12 -m venv /opt/venv \
+RUN python3.11 -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
 
 ENV PATH="/opt/venv/bin:$PATH"
