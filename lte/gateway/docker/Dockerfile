@@ -3,6 +3,8 @@
 # -----------------------------
 FROM ubuntu:24.04
 
+FROM ubuntu:24.04
+
 # -----------------------------
 # Step 1: Install system dependencies
 # -----------------------------
@@ -22,22 +24,23 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
-# Step 2: Set Python path
+# Step 2: Setup virtual environment
 # -----------------------------
-ENV PATH="/usr/local/bin:$PATH"
-ENV PYTHON_BIN_PATH=/usr/bin/python3.12
+WORKDIR /magma/lte/gateway/python
 
-# Upgrade pip & setuptools & wheel
-RUN python3.12 -m pip install --upgrade pip setuptools wheel cython
+RUN python3.12 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
+
+ENV PATH="/opt/venv/bin:$PATH"
 
 # -----------------------------
-# Step 3: Copy Magma gateway source
+# Step 3: Copy source code
 # -----------------------------
 WORKDIR /magma
 COPY . .
 
 # -----------------------------
-# Step 4: Install Python LTE packages
+# Step 4: Install Magma LTE Python dependencies
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 RUN pip install --no-cache-dir -e .
