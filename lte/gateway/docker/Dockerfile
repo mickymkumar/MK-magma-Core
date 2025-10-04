@@ -60,16 +60,36 @@ RUN mkdir -p $MAGMA_ROOT/third_party/liblfds && \
 RUN bazel build //lte/gateway/c/...
 
 # ----------------------------
-# Stage 2: Python dependencies
+# Stage: Python build
 # ----------------------------
-FROM base AS build-python
+FROM ubuntu:24.04 AS build-python
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-venv \
+    python3-pip \
+    git \
+    build-essential \
+    wget \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /magma
 
 # Copy Magma source
-COPY . $MAGMA_ROOT
+COPY . .
 
-# Install pip dependencies
-RUN python3 -m pip install --upgrade pip setuptools wheel
-RUN python3 -m pip install -r $MAGMA_ROOT/lte/gateway/python/requirements.txt
+# Create virtual environment
+RUN python3 -m venv /opt/venv
+
+# Activate venv and install dependencies
+RUN /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
+    /opt/venv/bin/pip install -r lte/gateway/python/requirements.txt
+
+# Set environment to use the venv by default
+ENV PATH="/opt/venv/bin:$PATH"
+
 
 # ----------------------------
 # Stage 3: Final runtime image
