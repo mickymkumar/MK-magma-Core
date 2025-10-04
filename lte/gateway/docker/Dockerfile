@@ -54,7 +54,8 @@ COPY . $MAGMA_ROOT
 RUN mkdir -p $MAGMA_ROOT/third_party/liblfds && \
     wget --no-check-certificate -O $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
-    unzip -q $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip -d $MAGMA_ROOT/third_party/liblfds
+    unzip -o -q $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip -d $MAGMA_ROOT/third_party/liblfds
+
 
 # Build all C services with Bazel
 RUN bazel build //lte/gateway/c/...
