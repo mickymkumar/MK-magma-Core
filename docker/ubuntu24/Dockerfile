@@ -88,12 +88,11 @@ RUN sysctl -w net.ipv4.ip_forward=1
 # -----------------------------
 # Step 8: Add startup script to launch AGW services
 # -----------------------------
-# Ensure start_agw.sh exists in the build context (current folder)
-COPY start_agw.sh /magma/start_agw.sh
-RUN chmod +x /magma/start_agw.sh
+COPY start_agw.sh /magma/lte/gateway/start_agw.sh
+RUN chmod +x /magma/lte/gateway/start_agw.sh
 
 # -----------------------------
 # Step 9: Default runtime
 # -----------------------------
-WORKDIR /magma
-CMD ["/magma/start_agw.sh"]
+WORKDIR /magma/lte/gateway
+CMD ["./start_agw.sh"]
