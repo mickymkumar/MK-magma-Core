@@ -1,7 +1,7 @@
 # ----------------------------
 # Stage 0: Base image
 # ----------------------------
-FROM ubuntu:24.04 AS base
+FROM ubuntu:22.04 AS base  # use Ubuntu 22.04 to get Python 3.10
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,9 +10,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
     git \
-    python3 \
+    python3.10 \
+    python3.10-venv \
+    python3.10-distutils \
     python3-pip \
-    python3-venv \
     openvswitch-switch \
     iproute2 \
     net-tools \
@@ -61,18 +62,10 @@ RUN bazel build //lte/gateway/c/...
 # ----------------------------
 # Stage 2: Python build
 # ----------------------------
-FROM ubuntu:24.04 AS build-python
+FROM base AS build-python
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-venv \
-    python3-pip \
-    git \
-    build-essential \
-    wget \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+# Use Python 3.10
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1
 
 WORKDIR /magma
 
@@ -108,8 +101,8 @@ COPY --from=build-python $MAGMA_ROOT /magma
 ENV MAGMA_ROOT=/magma
 WORKDIR $MAGMA_ROOT
 
-# Expose necessary ports (example)
+# Expose necessary ports
 EXPOSE 50051-50082 60051 60055 8443
 
-# Entrypoint for Python services
+# Entrypoint
 ENTRYPOINT ["/usr/bin/env", "python3", "-m", "magma.magmad.main"]
