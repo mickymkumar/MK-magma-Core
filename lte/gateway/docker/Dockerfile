@@ -19,11 +19,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     libxml2-dev \
     libxslt1-dev \
     libgmp-dev \
-    python3.12 \
-    python3.12-venv \
-    python3-pip \
-    python3.12-dev \
-    libpq-dev \
     net-tools \
     iproute2 \
     iputils-ping \
@@ -34,10 +29,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
-# Step 2: Setup Python virtual environment
+# Step 2: Install Python 3.10 via deadsnakes
 # -----------------------------
-WORKDIR /magma/lte/gateway/python
-
 RUN add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -47,20 +40,23 @@ RUN add-apt-repository ppa:deadsnakes/ppa \
         python3.10-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# -----------------------------
+# Step 3: Setup Python virtual environment
+# -----------------------------
+WORKDIR /magma/lte/gateway/python
 RUN python3.10 -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-
 # -----------------------------
-# Step 3: Copy Magma source code
+# Step 4: Copy Magma source code
 # -----------------------------
 WORKDIR /magma
 COPY . .
 
 # -----------------------------
-# Step 4: Install Python dependencies for LTE/5G gateway
+# Step 5: Install Python dependencies for LTE/5G gateway
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
@@ -69,28 +65,33 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libxml2-dev libxslt1-dev zlib1g-dev python3-dev build-essential libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Pin setuptools to a compatible version for ryu
+# Pin setuptools for ryu compatibility
 RUN pip install --no-cache-dir --upgrade pip wheel cython
 RUN pip install --no-cache-dir "setuptools==65.5.0"
 
-# Now install Magma Python packages in editable mode
+# Install Magma Python packages
 RUN pip install --no-cache-dir -e .
 
 # -----------------------------
-# Step 5: Setup 5G Core binaries (AMF, SMF, UPF)
+# Step 6: Setup 5G Core binaries (AMF, SMF, UPF)
 # -----------------------------
 WORKDIR /magma/5g/core
-
-# Example: clone Magma 5G repo if not already included
+# Optional: clone or build 5G core binaries if not included
 # RUN git clone https://github.com/magma/magma.git . && ./build.sh
 
 # -----------------------------
-# Step 6: Enable IP forwarding for UPF
+# Step 7: Enable IP forwarding for UPF
 # -----------------------------
 RUN sysctl -w net.ipv4.ip_forward=1
 
 # -----------------------------
-# Step 7: Default runtime
+# Step 8: Add startup script to launch AGW services
+# -----------------------------
+COPY start_agw.sh /magma/start_agw.sh
+RUN chmod +x /magma/start_agw.sh
+
+# -----------------------------
+# Step 9: Default runtime
 # -----------------------------
 WORKDIR /magma
-CMD ["/bin/bash"]
+CMD ["/magma/start_agw.sh"]
