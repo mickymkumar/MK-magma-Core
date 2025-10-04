@@ -57,7 +57,7 @@ WORKDIR /magma
 COPY . .
 
 # -----------------------------
-# Step 5: Install Python dependencies for LTE/5G gateway
+# Step 5: Install Python dependencies manually
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
@@ -70,9 +70,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 RUN pip install --no-cache-dir --upgrade pip wheel cython
 RUN pip install --no-cache-dir "setuptools==65.5.0"
 
-# Install Magma Python packages via requirements.txt
-COPY lte/gateway/python/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python packages manually (replace with any additional dependencies your AGW needs)
+RUN pip install --no-cache-dir grpcio requests six protobuf
 
 # -----------------------------
 # Step 6: Setup 5G Core binaries (AMF, SMF, UPF)
@@ -89,6 +88,7 @@ RUN sysctl -w net.ipv4.ip_forward=1
 # -----------------------------
 # Step 8: Add startup script to launch AGW services
 # -----------------------------
+# Ensure start_agw.sh exists in the build context (current folder)
 COPY start_agw.sh /magma/start_agw.sh
 RUN chmod +x /magma/start_agw.sh
 
