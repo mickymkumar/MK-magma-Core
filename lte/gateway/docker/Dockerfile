@@ -64,19 +64,16 @@ COPY . .
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
 
-# Install required build dependencies for common wheels (lxml, ryu, pystemd)
+# Install system build dependencies for wheels
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    libxml2-dev \
-    libxslt1-dev \
-    zlib1g-dev \
-    python3-dev \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
+    libxml2-dev libxslt1-dev zlib1g-dev python3-dev build-essential libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Magma Python packages in editable mode
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Pin setuptools to a compatible version for ryu
+RUN pip install --no-cache-dir --upgrade pip wheel cython
+RUN pip install --no-cache-dir "setuptools==65.5.0"
+
+# Now install Magma Python packages in editable mode
 RUN pip install --no-cache-dir -e .
 
 # -----------------------------
