@@ -6,66 +6,79 @@ FROM ubuntu:24.04 AS base
 # Prevent interactive prompts during install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies, dev headers, and pkg-config
+# Install system tools, Python, Bazel dependencies
 RUN apt-get update && apt-get install -y \
-    python3.12 python3.12-venv python3.12-dev \
-    build-essential git curl wget pkg-config \
-    libssl-dev libffi-dev libpq-dev libsystemd-dev \
-    unzip gnupg software-properties-common \
+    python3.12 python3.12-venv python3.12-dev python3-pip \
+    build-essential git curl wget pkg-config gnupg software-properties-common \
+    libssl-dev libffi-dev libpq-dev libsystemd-dev lsb-release unzip \
+    openjdk-11-jdk \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure python3 -> python3.12 and pip -> pip3
-RUN ln -s /usr/bin/python3.12 /usr/bin/python3 && \
-    ln -s /usr/bin/pip3 /usr/bin/pip
+# Set python3 -> python3.12 and pip -> pip3 using update-alternatives
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1 \
+    && update-alternatives --set python3 /usr/bin/python3.12 \
+    && update-alternatives --set pip /usr/bin/pip3
 
 # ----------------------------
-# Stage 1: Python + Bazel build environment
+# Stage 1: Bazel install
+# ----------------------------
+FROM base AS bazel
+
+# Install Bazelisk (recommended for Bazel builds)
+RUN curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.22.0/bazelisk-linux-amd64" \
+    && mv bazelisk-linux-amd64 /usr/local/bin/bazel \
+    && chmod +x /usr/local/bin/bazel \
+    && bazel version
+
+# ----------------------------
+# Stage 2: Python build
 # ----------------------------
 FROM base AS build-python
 
-# Create a virtual environment
+# Create virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip, setuptools, wheel in venv
+# Upgrade pip & tools
 RUN pip install --upgrade pip setuptools wheel
 
-# ----------------------------
-# Install Bazel 5.2.0
-# ----------------------------
-RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
-    mv bazel.gpg /usr/share/keyrings/ && \
-    echo "deb [signed-by=/usr/share/keyrings/bazel.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" > /etc/apt/sources.list.d/bazel.list && \
-    apt-get update && apt-get install -y bazel-5.2.0 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy Magma LTE source code
+# Copy Magma AGW source code
 WORKDIR /magma
 COPY . .
 
-# Install Python deps via setup.py (instead of requirements.txt)
+# Install Python deps via setup.py
 WORKDIR /magma/lte/gateway/python
 RUN pip install -e .
 
-# Build C services with Bazel
+# ----------------------------
+# Stage 3: Bazel build of C/C++ services
+# ----------------------------
+FROM bazel AS build-agw
+
 WORKDIR /magma
-RUN bazel build //lte/gateway/c/...
+
+# Copy source code
+COPY . .
+
+# Bazel build (adjust targets as needed)
+RUN bazel build //lte/gateway/c/... --jobs=$(nproc)
 
 # ----------------------------
-# Stage 2: Runtime image
+# Stage 4: Runtime image
 # ----------------------------
 FROM base AS runtime
 
-# Copy virtual environment from build stage
+# Copy Python virtual environment
 COPY --from=build-python /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy Magma LTE gateway code
+# Copy Magma source code
 WORKDIR /magma
 COPY . .
 
-# Copy Bazel-built binaries (optional, if you need them in runtime)
-COPY --from=build-python /magma/bazel-bin /magma/bazel-bin
+# Copy Bazel build outputs (C/C++ binaries)
+COPY --from=build-agw /magma/bazel-bin /magma/bazel-bin
 
-# Default command (adjust to run a specific service)
+# Default command (adjust to launch AGW service)
 CMD ["python3", "-m", "magma"]
