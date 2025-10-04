@@ -29,18 +29,16 @@ check_command "Failed to install required system packages"
 # Set virtual environment directory
 VENV_DIR="/magma/venv"
 
-# Create venv if it doesn't exist
-if [ ! -d "$VENV_DIR" ]; then
-    echo "[*] Creating Python virtual environment at $VENV_DIR..."
-    mkdir -p /magma
-    check_command "Failed to create /magma directory"
+# Create virtual environment if missing
+if [ ! -d "$VENV_DIR" ] || [ ! -f "$VENV_DIR/bin/activate" ]; then
+    echo "[*] Virtual environment not found. Creating at $VENV_DIR..."
     python3 -m venv "$VENV_DIR"
     check_command "Failed to create virtual environment"
 fi
 
 # Activate virtual environment
+echo "[*] Activating virtual environment..."
 if [ -f "$VENV_DIR/bin/activate" ]; then
-    echo "[*] Activating virtual environment..."
     source "$VENV_DIR/bin/activate"
 else
     echo "[ERROR] Virtual environment activate script not found at $VENV_DIR/bin/activate"
@@ -69,18 +67,14 @@ else
     exit 1
 fi
 
-# Start LTE Gateway
-echo "[*] Starting LTE Gateway scripts..."
-SCRIPTS_DIR="$PYTHON_DIR/scripts"
-if [ -d "$SCRIPTS_DIR" ]; then
-    cd "$SCRIPTS_DIR"
-    for cli in *_cli.py; do
-        echo "[*] Starting $cli..."
-        python3 "$cli" &
-        check_command "Failed to start $cli"
-    done
+# Start main LTE CLI
+MAIN_CLI="$PYTHON_DIR/scripts/mobility_cli.py"
+if [ -f "$MAIN_CLI" ]; then
+    echo "[*] Starting LTE Gateway ($MAIN_CLI)..."
+    python3 "$MAIN_CLI" &
+    check_command "Failed to start $MAIN_CLI"
 else
-    echo "[ERROR] Scripts directory not found at $SCRIPTS_DIR"
+    echo "[ERROR] Main LTE CLI script not found at $MAIN_CLI"
     exit 1
 fi
 
