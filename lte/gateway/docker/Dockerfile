@@ -56,7 +56,9 @@ WORKDIR /magma/lte/gateway/python
 
 # Install required build dependencies for common wheels (lxml, ryu, pystemd)
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    libxml2-dev libxslt1-dev zlib1g-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
     python3-dev \
     build-essential \
     libffi-dev \
