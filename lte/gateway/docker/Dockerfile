@@ -85,7 +85,8 @@ RUN python3 -m venv /opt/venv
 
 # Activate venv and install dependencies
 RUN /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/venv/bin/pip install -r lte/gateway/python/requirements.txt
+    /opt/venv/bin/pip install -r /magma/lte/gateway/python/requirements.txt
+
 
 # Set environment to use the venv by default
 ENV PATH="/opt/venv/bin:$PATH"
