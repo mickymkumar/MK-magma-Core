@@ -5,76 +5,70 @@ FROM ubuntu:24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# System deps for Python, Bazel, lxml, pystemd, etc.
+# Install basic packages and Python 3.12
 RUN apt-get update && apt-get install -y \
-    python3.12 python3.12-venv python3.12-dev python3-pip \
-    build-essential git curl wget pkg-config gnupg software-properties-common \
-    libssl-dev libffi-dev libpq-dev libsystemd-dev lsb-release unzip \
-    openjdk-11-jdk \
-    libxml2-dev libxslt-dev zlib1g-dev \
+    python3.12 python3.12-venv python3.12-dev \
+    build-essential git curl wget pkg-config \
+    libssl-dev libffi-dev libpq-dev \
+    libxml2-dev libxslt1-dev zlib1g-dev \
+    openjdk-11-jdk unzip bash \
     && rm -rf /var/lib/apt/lists/*
 
-# Make python3/pip point to Python 3.12
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
-
-
-# ----------------------------
-# Stage 1: Bazel install
-# ----------------------------
-FROM base AS bazel
-
-RUN curl -LO "https://github.com/bazelbuild/bazelisk/releases/download/v1.22.0/bazelisk-linux-amd64" \
-    && mv bazelisk-linux-amd64 /usr/local/bin/bazel \
-    && chmod +x /usr/local/bin/bazel \
-    && bazel version
-
+# Symlink python & pip
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
 
 # ----------------------------
-# Stage 2: Python dependencies build
+# Stage 1: Python environment
 # ----------------------------
 FROM base AS build-python
 
-# Create isolated venv
+WORKDIR /magma
+
+# Copy Magma code
+COPY . .
+
+# Create virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip/wheel and pin setuptools < 68 for legacy packages like ryu
-RUN pip install --upgrade pip wheel && pip install "setuptools<68"
+# Upgrade pip & setuptools
+RUN pip install --upgrade pip setuptools wheel
 
-# Copy Magma source into container
-WORKDIR /magma
-COPY . .
-
-# Install Python deps (editable mode for AGW Python services)
+# Install Python dependencies for Magma LTE gateway
 WORKDIR /magma/lte/gateway/python
-RUN pip install -e .
-
+RUN pip install --upgrade cython && pip install -e .
 
 # ----------------------------
-# Stage 3: Build AGW C services with Bazel
+# Stage 2: Build AGW binaries
 # ----------------------------
-FROM bazel AS build-agw
+FROM build-python AS build-agw
 
 WORKDIR /magma
-COPY . .
 
+# Install Bazel
+RUN curl -LO https://github.com/bazelbuild/bazel/releases/download/5.2.0/bazel-5.2.0-linux-x86_64 && \
+    chmod +x bazel-5.2.0-linux-x86_64 && mv bazel-5.2.0-linux-x86_64 /usr/local/bin/bazel
+
+# Clean Bazel caches
+RUN bazel clean --expunge
+
+# Build AGW C binaries
 RUN bazel build //lte/gateway/c/... --jobs=$(nproc)
 
-
 # ----------------------------
-# Stage 4: Runtime image
+# Stage 3: Runtime image
 # ----------------------------
 FROM base AS runtime
 
-# Copy Python venv with all deps
+# Copy Python virtual environment
 COPY --from=build-python /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy Magma source and built binaries
-WORKDIR /magma
-COPY . .
-COPY --from=build-agw /magma/bazel-bin /magma/bazel-bin
+# Copy Magma AGW binaries
+COPY --from=build-agw /magma /magma
 
-# Default command (adjust as needed, e.g., run enodebd, mme, or python service)
+WORKDIR /magma
+
+# Default command
 CMD ["python3", "-m", "magma"]
