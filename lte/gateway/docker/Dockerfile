@@ -38,14 +38,13 @@ WORKDIR $MAGMA_ROOT
 # ----------------------------
 FROM base AS build-c
 
-# Install Bazel
-RUN apt-get update && apt-get install -y curl gnupg
-RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg \
-    && mv bazel-archive-keyring.gpg /usr/share/keyrings
-RUN apt-get update && apt-get install -y apt-transport-https
-RUN echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-    | tee /etc/apt/sources.list.d/bazel.list
-RUN apt-get update && apt-get install -y bazel
+# Install Bazel 5.2.0
+RUN apt-get update && apt-get install -y curl gnupg apt-transport-https && \
+    curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > /usr/share/keyrings/bazel-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
+        | tee /etc/apt/sources.list.d/bazel.list && \
+    apt-get update && apt-get install -y bazel-5.2.0 && \
+    ln -s /usr/bin/bazel-5.2.0 /usr/bin/bazel
 
 # Copy Magma source
 COPY . $MAGMA_ROOT
@@ -56,12 +55,11 @@ RUN mkdir -p $MAGMA_ROOT/third_party/liblfds && \
     "https://liblfds.org/downloads/liblfds%20release%207.1.0%20source.zip" && \
     unzip -o -q $MAGMA_ROOT/third_party/liblfds/liblfds-release-7.1.0-source.zip -d $MAGMA_ROOT/third_party/liblfds
 
-
 # Build all C services with Bazel
 RUN bazel build //lte/gateway/c/...
 
 # ----------------------------
-# Stage: Python build
+# Stage 2: Python build
 # ----------------------------
 FROM ubuntu:24.04 AS build-python
 
@@ -90,7 +88,6 @@ RUN /opt/venv/bin/pip install --upgrade pip setuptools wheel && \
 
 # Set environment to use the venv by default
 ENV PATH="/opt/venv/bin:$PATH"
-
 
 # ----------------------------
 # Stage 3: Final runtime image
