@@ -9,42 +9,26 @@ echo "=========================="
 sysctl -w net.ipv4.ip_forward=1
 
 # Paths
-VENV_PATH=/magma/venv
-
-# Detect LTE Python path
-if [ -d /magma/magma/lte/gateway/python ]; then
-    LTE_PYTHON_PATH=/magma/magma/lte/gateway/python
-elif [ -d /magma/lte/gateway/python ]; then
-    LTE_PYTHON_PATH=/magma/lte/gateway/python
-else
-    echo "[ERROR] Could not find LTE python directory!"
-    exit 1
-fi
-
-# Create venv if missing
-if [ ! -f "$VENV_PATH/bin/activate" ]; then
-    echo "[*] Creating Python virtual environment at $VENV_PATH..."
-    python3 -m venv $VENV_PATH
-fi
+VENV_PATH=/opt/venv
+LTE_PYTHON_PATH=/magma/lte/gateway/python
 
 # Activate venv
 echo "[*] Activating virtual environment..."
 source $VENV_PATH/bin/activate
 
-# Upgrade pip etc.
+# Upgrade pip, setuptools, wheel
 pip install --upgrade pip setuptools wheel
 
 # Add LTE python directories to PYTHONPATH
 export PYTHONPATH=$LTE_PYTHON_PATH:$LTE_PYTHON_PATH/magma:$PYTHONPATH
 
-# Start LTE Gateway CLI (pick a default script to run)
-DEFAULT_CLI="$LTE_PYTHON_PATH/scripts/hello_cli.py"
-if [ -f "$DEFAULT_CLI" ]; then
-    echo "[*] Starting LTE Gateway CLI: $DEFAULT_CLI"
-    python3 "$DEFAULT_CLI" &
-else
-    echo "[WARN] No default CLI script found, check $LTE_PYTHON_PATH/scripts/"
-fi
+# Start LTE Gateway services
+for service in magmad mobilityd state_service; do
+    if [ -f "$LTE_PYTHON_PATH/$service.py" ]; then
+        echo "[*] Starting $service..."
+        python3 "$LTE_PYTHON_PATH/$service.py" &
+    fi
+done
 
 # Start 5G Core services if available
 if [ -d /magma/5g/core ]; then
@@ -60,7 +44,7 @@ sleep 5
 
 # Verify
 echo "[*] Checking LTE and 5G services..."
-ps aux | grep -E "python3.*_cli|amf|smf|upf" | grep -v grep
+ps aux | grep -E "python3.*_service|amf|smf|upf" | grep -v grep
 
 echo "=========================="
 echo "Magma AGW startup complete"
