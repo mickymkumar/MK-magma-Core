@@ -1,8 +1,33 @@
 # -----------------------------
 # Magma Core AGW (LTE + 5G) Ubuntu 24.04
 # -----------------------------
+# Base image
 FROM ubuntu:24.04
 
+ENV container docker
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install systemd and dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        systemd systemd-sysv sudo \
+        ifupdown net-tools iproute2 bridge-utils openvswitch-switch \
+        python3 python3-venv python3-pip git curl wget unzip make software-properties-common \
+        apt-transport-https zip rsync && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Setup Magma user
+RUN useradd -ms /bin/bash magma && \
+    echo "magma ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set working directory
+WORKDIR /home/magma
+VOLUME /home/magma
+
+# systemd entrypoint
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
 # -----------------------------
 # Step 1: Install system dependencies
 # -----------------------------
