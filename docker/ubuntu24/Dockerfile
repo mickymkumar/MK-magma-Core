@@ -36,11 +36,17 @@ RUN python3 -m venv /opt/venv && \
 WORKDIR /magma
 RUN git clone https://github.com/magma/magma.git . || true
 
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential autoconf automake libtool pkg-config cmake git python3-dev \
+        libssl-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # -----------------------------
 # Step 4: Install Python dependencies
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
-RUN /opt/venv/bin/pip install --no-cache-dir grpcio==1.56.0 requests six protobuf
+RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
 
 # -----------------------------
 # Step 5: Enable IP forwarding
