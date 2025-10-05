@@ -59,23 +59,3 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         lksctp-tools libsctp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# -----------------------------
-# Step 8: Create OVS bridge
-# -----------------------------
-RUN ovs-vsctl add-br uplink_br0 && ip link set dev uplink_br0 up
-
-# -----------------------------
-# Step 9: Supervisor configuration
-# -----------------------------
-RUN mkdir -p /etc/supervisor/conf.d
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# -----------------------------
-# Step 10: Expose necessary ports
-# -----------------------------
-EXPOSE 36412 2123 5000 5001 5002 5003 5004
-
-# -----------------------------
-# Step 11: Default command
-# -----------------------------
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
