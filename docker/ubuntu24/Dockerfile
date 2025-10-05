@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
         dkms linux-headers-$(uname -r) ifupdown \
+        openvswitch-datapath-dkms \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -53,23 +54,12 @@ WORKDIR /magma/lte/gateway/python
 RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
 
 # -----------------------------
-# Step 6: Download Open vSwitch source & build DKMS module
-# -----------------------------
-RUN mkdir -p /usr/src/openvswitch-2.15.4-9 && \
-    cd /usr/src/openvswitch-2.15.4-9 && \
-    wget https://www.openvswitch.org/releases/openvswitch-2.15.4.tar.gz && \
-    tar -xzf openvswitch-2.15.4.tar.gz --strip-components=1 && \
-    dkms add -m openvswitch -v 2.15.4-9 && \
-    dkms build -m openvswitch -v 2.15.4-9 && \
-    dkms install -m openvswitch -v 2.15.4-9
-
-# -----------------------------
-# Step 7: Enable IP forwarding
+# Step 6: Enable IP forwarding
 # -----------------------------
 RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf && sysctl -p
 
 # -----------------------------
-# Step 8: Default CMD to run all AGW services
+# Step 7: Default CMD to run all AGW services
 # -----------------------------
 WORKDIR /magma/lte/gateway
 CMD ["bash", "-c", "\
