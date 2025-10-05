@@ -53,11 +53,11 @@ RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 RUN mkdir -p /etc/magma /var/opt/magma
 
 # -----------------------------
-# Step 7: Install & build sctpd
+# Step 7: Install SCTP daemon
 # -----------------------------
-RUN git clone https://github.com/sctplab/sctp-refimpl.git /tmp/sctp && \
-    cd /tmp/sctp && ./bootstrap && ./configure && make && make install && \
-    rm -rf /tmp/sctp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        lksctp-tools libsctp-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
 # Step 8: Create OVS bridge
