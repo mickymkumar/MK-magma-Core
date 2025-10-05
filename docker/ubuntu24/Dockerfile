@@ -7,11 +7,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/opt/venv/bin:$PATH"
 
 # -----------------------------
-# Step 0: Install base dependencies
+# Step 0: Install base dependencies + Python 3.10
 # -----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo net-tools iproute2 bridge-utils openvswitch-switch iputils-ping tcpdump iptables \
-        python3 python3-venv python3-dev python3-pip \
+        python3.10 python3.10-venv python3.10-dev python3-pip \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
         ifupdown lsb-release gnupg supervisor autoconf automake libtool lksctp-tools \
@@ -27,7 +27,7 @@ VOLUME /home/magma
 # -----------------------------
 # Step 2: Setup Python virtual environment
 # -----------------------------
-RUN python3 -m venv /opt/venv && \
+RUN python3.10 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
 
 # -----------------------------
