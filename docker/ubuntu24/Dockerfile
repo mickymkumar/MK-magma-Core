@@ -58,18 +58,14 @@ RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
 RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf && sysctl -p
 
 # -----------------------------
-# Step 7: Add startup script
-# -----------------------------
-COPY start_agw.sh /magma/lte/gateway/start_agw.sh
-RUN chmod +x /magma/lte/gateway/start_agw.sh
-
-# -----------------------------
-# Step 8: Patch AGW scripts (if any ifup/ifdown)
-# -----------------------------
-RUN sed -i 's/ifdown /ip link set /g; s/ifup /ip link set /g' /magma/lte/gateway/start_agw.sh || true
-
-# -----------------------------
-# Step 9: Keep container alive
+# Step 7: Default CMD to run all AGW services directly
 # -----------------------------
 WORKDIR /magma/lte/gateway
-CMD ["/magma/lte/gateway/start_agw.sh"]
+CMD ["bash", "-c", "\
+    sysctl -w net.ipv4.ip_forward=1 && \
+    /opt/venv/bin/python3 /magma/lte/gateway/python/mme.py & \
+    /opt/venv/bin/python3 /magma/lte/gateway/python/sessiond.py & \
+    /opt/venv/bin/python3 /magma/lte/gateway/python/pipelined.py & \
+    /usr/sbin/sctpd -d & \
+    wait \
+"]
