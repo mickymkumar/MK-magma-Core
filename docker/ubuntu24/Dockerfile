@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-dev python3-pip \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
-        ifupdown iproute2 lsb-release gnupg supervisor \
+        ifupdown lsb-release gnupg supervisor autoconf automake libtool lksctp-tools \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -36,17 +36,11 @@ RUN python3 -m venv /opt/venv && \
 WORKDIR /magma
 RUN git clone https://github.com/magma/magma.git . || true
 
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential autoconf automake libtool pkg-config cmake git python3-dev \
-        libssl-dev && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
 # -----------------------------
 # Step 4: Install Python dependencies
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
-RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
+RUN /opt/venv/bin/pip install --no-cache-dir grpcio==1.56.0 requests six protobuf
 
 # -----------------------------
 # Step 5: Enable IP forwarding
@@ -54,17 +48,34 @@ RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
 RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 
 # -----------------------------
-# Step 6: Supervisor configuration
+# Step 6: Create Magma config directories
+# -----------------------------
+RUN mkdir -p /etc/magma /var/opt/magma
+
+# -----------------------------
+# Step 7: Install & build sctpd
+# -----------------------------
+RUN git clone https://github.com/sctplab/sctp-refimpl.git /tmp/sctp && \
+    cd /tmp/sctp && ./bootstrap && ./configure && make && make install && \
+    rm -rf /tmp/sctp
+
+# -----------------------------
+# Step 8: Create OVS bridge
+# -----------------------------
+RUN ovs-vsctl add-br uplink_br0 && ip link set dev uplink_br0 up
+
+# -----------------------------
+# Step 9: Supervisor configuration
 # -----------------------------
 RUN mkdir -p /etc/supervisor/conf.d
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # -----------------------------
-# Step 7: Expose necessary ports
+# Step 10: Expose necessary ports
 # -----------------------------
 EXPOSE 36412 2123 5000 5001 5002 5003 5004
 
 # -----------------------------
-# Step 8: Default command
+# Step 11: Default command
 # -----------------------------
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
