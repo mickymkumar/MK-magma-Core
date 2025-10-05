@@ -1,5 +1,5 @@
 # -----------------------------
-# Magma Core AGW (LTE + 5G) Ubuntu 24.04
+# Magma Core AGW (LTE + 5G) Ubuntu 24.04 - Container Friendly
 # -----------------------------
 FROM ubuntu:24.04
 
@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-pip python3-dev \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
-        dkms linux-headers-$(uname -r) ifupdown \
-        openvswitch-datapath-dkms \
+        ifupdown \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -45,7 +44,7 @@ RUN python3.10 -m venv /opt/venv && \
 # -----------------------------
 WORKDIR /magma
 RUN git clone https://github.com/magma/magma.git . || true
-# COPY . .  # use if local source is preferred
+# COPY . .  # Uncomment if using local source instead of git clone
 
 # -----------------------------
 # Step 5: Install Python dependencies
