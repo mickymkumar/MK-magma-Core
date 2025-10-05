@@ -11,10 +11,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # -----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo net-tools iproute2 bridge-utils openvswitch-switch iputils-ping tcpdump iptables \
-        python3.10 python3.10-venv python3.10-dev python3-pip \
+        python3 python3-venv python3-dev python3-pip \
         curl wget git unzip make build-essential cmake pkg-config software-properties-common \
         libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
-        ifupdown iproute2 lsb-release gnupg \
+        ifupdown iproute2 lsb-release gnupg supervisor \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
@@ -27,7 +27,7 @@ VOLUME /home/magma
 # -----------------------------
 # Step 2: Setup Python virtual environment
 # -----------------------------
-RUN python3.10 -m venv /opt/venv && \
+RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
 
 # -----------------------------
@@ -40,7 +40,7 @@ RUN git clone https://github.com/magma/magma.git . || true
 # Step 4: Install Python dependencies
 # -----------------------------
 WORKDIR /magma/lte/gateway/python
-RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
+RUN /opt/venv/bin/pip install --no-cache-dir grpcio==1.56.0 requests six protobuf
 
 # -----------------------------
 # Step 5: Enable IP forwarding
@@ -48,14 +48,17 @@ RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
 RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
 
 # -----------------------------
-# Step 6: Default CMD to run all AGW services
+# Step 6: Supervisor configuration
 # -----------------------------
-WORKDIR /magma/lte/gateway
-CMD ["bash", "-c", "\
-    sysctl -w net.ipv4.ip_forward=1 && \
-    /opt/venv/bin/python3 mme.py & \
-    /opt/venv/bin/python3 sessiond.py & \
-    /opt/venv/bin/python3 pipelined.py & \
-    /usr/sbin/sctpd -d & \
-    wait \
-"]
+RUN mkdir -p /etc/supervisor/conf.d
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# -----------------------------
+# Step 7: Expose necessary ports
+# -----------------------------
+EXPOSE 36412 2123 5000 5001 5002 5003 5004
+
+# -----------------------------
+# Step 8: Default command
+# -----------------------------
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
