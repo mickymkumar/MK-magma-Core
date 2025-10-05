@@ -13,9 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         sudo systemd systemd-sysv \
         net-tools iproute2 bridge-utils openvswitch-switch iputils-ping tcpdump iptables \
         python3 python3-venv python3-pip python3-dev \
-        curl wget git unzip make build-essential cmake pkg-config software-properties-common \
-        libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+        build-essential dkms libelf-dev linux-libc-dev pkg-config \
+        curl wget git unzip make cmake software-properties-common \
+        libsystemd-dev libffi-dev libssl-dev libxml2-dev libxslt1-dev libgmp-dev zlib1g-dev rsync zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -----------------------------
 # Step 1: Add Magma user
@@ -25,40 +26,45 @@ WORKDIR /home/magma
 VOLUME /home/magma
 
 # -----------------------------
-# Step 2: Install Python 3.10
+# Step 2: Setup Python virtual environment
 # -----------------------------
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-dev python3-pip && \
-    rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip setuptools wheel cython grpcio requests six protobuf
 
 # -----------------------------
-# Step 3: Setup Python virtual environment
-# -----------------------------
-RUN python3.10 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip setuptools wheel cython
-
-# -----------------------------
-# Step 4: Clone Magma repo (or COPY local source)
+# Step 3: Clone Magma repo
 # -----------------------------
 WORKDIR /magma
 RUN git clone https://github.com/magma/magma.git . || true
-# If using local source instead, uncomment the next line and comment out the git clone
+# If using local source instead, uncomment the next line
 # COPY . .
 
 # -----------------------------
-# Step 5: Install Python dependencies
+# Step 4: Build Open vSwitch kernel module via DKMS
 # -----------------------------
-WORKDIR /magma/lte/gateway/python
-RUN /opt/venv/bin/pip install --no-cache-dir grpcio requests six protobuf
+RUN apt-get update && apt-get install -y --no-install-recommends linux-headers-$(uname -r) \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Ensure DKMS module for Open vSwitch is built
+RUN dkms remove -m openvswitch -v 2.15.4-9 --all || true && \
+    dkms add -m openvswitch -v 2.15.4-9 && \
+    dkms build -m openvswitch -v 2.15.4-9 && \
+    dkms install -m openvswitch -v 2.15.4-9
 
 # -----------------------------
-# Step 6: Enable IP forwarding
+# Step 5: Enable IP forwarding
 # -----------------------------
 RUN echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf && sysctl -p
 
 # -----------------------------
-# Step 7: Default CMD to run all AGW services directly
+# Step 6: Setup Open vSwitch integration bridge
+# -----------------------------
+RUN /etc/init.d/openvswitch-switch start && \
+    ovs-vsctl --may-exist add-br br-int && \
+    ip link set dev br-int up
+
+# -----------------------------
+# Step 7: Run all AGW services
 # -----------------------------
 WORKDIR /magma/lte/gateway
 CMD ["bash", "-c", "\
@@ -67,5 +73,7 @@ CMD ["bash", "-c", "\
     /opt/venv/bin/python3 /magma/lte/gateway/python/sessiond.py & \
     /opt/venv/bin/python3 /magma/lte/gateway/python/pipelined.py & \
     /usr/sbin/sctpd -d & \
+    ovs-vsctl --may-exist add-br br-int && \
+    ip link set dev br-int up && \
     wait \
 "]
